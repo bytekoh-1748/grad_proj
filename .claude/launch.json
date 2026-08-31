@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "grad-web",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "/Users/rehjd/Desktop/grad_web/.claude/devserver.py",
+        "5174",
+        "/Users/rehjd/Desktop/grad_web"
+      ],
+      "port": 5174
+    }
+  ]
+}

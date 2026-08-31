@@ -1,0 +1,206 @@
+:root {
+  --bg: #ffffff;
+  --ink: #111111;
+  --hint: #c4c4c4;
+
+  /* 글자 한 칸의 높이 = 슬롯머신 릴이 한 번에 올라가는 거리 */
+  --lh: 1.6;
+  --slot-h: calc(1em * var(--lh));
+
+  /* 글자가 옆으로 살짝 삐져나올 수 있는 여유 (잘림 방지) */
+  --bleed: 0.14em;
+
+  --dur: 440ms;
+  --ease: cubic-bezier(0.16, 0.84, 0.28, 1);
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  transition: background-color 1400ms ease, color 1400ms ease;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: 'Pretendard Variable', Pretendard, 'Plus Jakarta Sans', 'Noto Sans KR', sans-serif;
+}
+
+.stage {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10vmin 7vmin;
+  cursor: default;
+}
+
+.line {
+  margin: 0;
+  font-size: clamp(1.75rem, 5.4vw, 4rem);
+  font-weight: 400;
+  line-height: var(--lh);
+  letter-spacing: 0;
+  text-align: center;
+  white-space: nowrap;            /* 라인아트가 늘어나도 한 밴드로 */
+  transform-origin: center center;
+  transition: transform 700ms var(--ease);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 단어 단위로만 줄바꿈 */
+.word { white-space: nowrap; }
+
+/* 글자 한 칸 = 슬롯머신의 릴 창 */
+.slot {
+  display: inline-block;
+  box-sizing: content-box;      /* width = 글자 폭 그대로 */
+  vertical-align: top;
+  height: var(--slot-h);
+  overflow: hidden;             /* 위아래로 잘라내서 릴 효과 */
+  padding: 0 var(--bleed);
+  margin: 0 calc(-1 * var(--bleed));
+  transition: width var(--dur) var(--ease);
+  will-change: width;
+}
+
+.reel {
+  display: block;
+  transition: transform var(--dur) var(--ease);
+  will-change: transform;
+}
+
+.glyph {
+  display: block;
+  height: var(--slot-h);
+  line-height: var(--slot-h);
+  text-align: center;
+  white-space: pre;
+}
+
+/* 폭 측정용 (화면에 안 보임) */
+.ruler {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  white-space: pre;
+  visibility: hidden;
+  pointer-events: none;
+  line-height: var(--slot-h);
+}
+
+.hint {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: max(2.4rem, env(safe-area-inset-bottom));
+  margin: 0;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--hint);
+  user-select: none;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 900ms ease;
+}
+.hint.is-gone { opacity: 0; }
+
+/* ---- 라인아트 ------------------------------------------------ */
+
+/* 굳은 칸은 클리핑을 풀어서 선이 글자 칸 밖으로 피어나게 한다 */
+.slot.is-art { overflow: visible; }
+
+.glyph--art { padding: 0; }
+
+.glyph--art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;          /* viewBox 밖으로 나가는 선도 그린다 */
+}
+
+.art-path {
+  fill: none;
+  stroke-width: clamp(1.1px, 0.030em, 2.1px);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ---- 모든 글자가 라인아트가 되면 화면 반전 -------------------- */
+
+:root.inverted {
+  --bg: #000000;
+  --ink: #ffffff;
+  --hint: #3a3a3a;
+}
+
+/* 반전 뒤: 라인아트가 흐려지며 뒤로 물러난다 (축소는 JS 가 맡는다) */
+:root.receded .line {
+  transition: transform 1600ms var(--ease), filter 1600ms ease, opacity 1600ms ease;
+  filter: blur(5px);
+  opacity: 0.18;
+}
+
+/* ---- 마지막: 좌상단부터 글자로 화면 채우기 -------------------- */
+
+.fill {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  color: var(--ink);
+  font-family: 'Pretendard Variable', Pretendard, 'Noto Sans KR', 'Noto Sans JP', 'Noto Sans SC', sans-serif;
+  font-size: clamp(17px, 2.1vw, 34px);
+  font-weight: 400;
+}
+
+/* 한 줄. 밀 때 통째로 움직인다 */
+.row {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  transition: transform 1100ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.cell {
+  position: absolute;
+  top: 0;
+  text-align: center;
+  white-space: pre;
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+
+.cell.on     { opacity: 0.34; }   /* 스크램블 중 */
+.cell.locked { opacity: 1; }      /* 확정 */
+
+/* 밀려서 빈 자리를 채우며 자라는 흰 네모.
+   줄 높이를 다 쓰지 않고 가운데에만 앉아서 위아래로 숨 쉴 틈을 둔다. */
+.shove-block {
+  position: absolute;
+  top: 21%;
+  height: 58%;
+  width: 0;
+  background: #ffffff;
+  border-radius: 0.16em;        /* 알약 말고, 모서리만 살짝 */
+  transition: width 1100ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 리사이즈로 다시 깔 때는 애니메이션 없이 결과만 */
+.fill.no-anim .row,
+.fill.no-anim .shove-block { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur: 1ms; }
+  .hint { transition: none; }
+}
