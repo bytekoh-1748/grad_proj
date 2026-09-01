@@ -1,26 +1,44 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>안녕하세요, 좋은 하루 보내세요.</title>
+  <title>MONO-COLOR EDITORIAL — Interaction Archive</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500&family=Noto+Sans+JP:wght@400;500&family=Noto+Sans+KR:wght@400;500&family=Noto+Sans+SC:wght@400;500&family=Nunito:wght@400;500&family=Outfit:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500&family=Quicksand:wght@400;500&family=Zen+Maru+Gothic:wght@400;500&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Quantico:ital,wght@0,400;0,700;1,400;1,700&display=swap" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <main class="stage">
-    <p class="line" id="line" aria-label="안녕하세요, 좋은 하루 보내세요."></p>
-  </main>
+  <div class="graph" id="graph">
+    <canvas class="graph-sheet" id="sheet" aria-hidden="true"></canvas>
 
-  <!-- 안내 문구. 필요 없으면 이 <p> 한 줄만 지우면 됩니다. -->
-  <p class="hint" id="hint">클릭하거나 스크롤해 보세요</p>
+    <!-- 커서 — 기본은 옅은 검정, 구 위에서는 흰색 -->
+    <div class="cursor" id="cursor" aria-hidden="true"><i></i></div>
 
-  <!-- 마지막에 화면을 채우는 글자들 -->
-  <div class="fill" id="fill" aria-hidden="true"></div>
+    <!-- 머리말 — 화면 위를 가로지르는 세 칸과 오른쪽 끝의 점 -->
+    <header class="head">
+      <span class="head-a" id="head-a"></span>
+      <span class="head-b" id="head-b"></span>
+      <span class="head-c" id="head-c"></span>
+      <span class="head-mark" aria-hidden="true"></span>
+    </header>
+
+    <!-- 왼쪽 — 지금 보고 있는 인터랙션 -->
+    <section class="panel" id="panel" aria-live="polite">
+      <h2 class="panel-title" id="panel-title"></h2>
+      <p class="panel-desc" id="panel-desc"></p>
+    </section>
+
+    <!-- 아래 — 몇 번째인지, 그리고 남은 길이 -->
+    <p class="strip" aria-hidden="true"><span id="strip-num"></span><span class="strip-on" id="strip-on"></span><span class="strip-off" id="strip-off"></span></p>
+
+    <button class="sheet-close" id="close" type="button" aria-label="Close">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5 L19 19 M19 5 L5 19" /></svg>
+    </button>
+  </div>
 
   <script src="script.js"></script>
 </body>
