@@ -1,218 +1,650 @@
-/* mono-color editorial — 종이 위의 잉크 한두 도.
-   화면은 캔버스가 다 그리고, 여기서는 글자 자리만 잡는다.
-   활자는 Quantico 한 벌. 한글은 Pretendard 가 받는다. */
+/* ==================================================================
+ * CRAFT BOY — 인터랙션 카트리지
+ *
+ * 조판과 뼈대만 여기서 잡는다. 칩 위의 무늬와 화면 속 장면은
+ * 캔버스가 그린다.
+ *
+ * 움직임의 기준은 emilkowalski/skills 를 따른다.
+ *   · transform 과 opacity 만 움직인다
+ *   · 들어오고 나가는 것은 ease-out, 화면 안에서 옮겨 다니는 것은 ease-in-out
+ *   · 자주 보는 동작은 300ms 아래로, 드물게 보는 장면만 길게
+ *   · scale(0) 에서 시작하지 않는다 — 없던 것이 생기지는 않는다
+ * ================================================================ */
 
 :root {
   --paper: #FAFAF7;
+  --ground: #0E0E10;          /* 방 바닥 — 거의 검정 */
+  --ground-2: #17171A;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --mono: 'Quantico', 'Pretendard Variable', Pretendard, 'Noto Sans KR', sans-serif;
+  --serif: 'Instrument Serif', 'Pretendard Variable', Georgia, serif;
+
+  /* 칩 한 장의 크기 — 모든 칩이 같다 */
+  --card-w: clamp(170px, min(23vw, 39vh), 340px);
+  --card-h: calc(var(--card-w) / 0.76);
+
+  /* 게임기 — 가로로 누운 몸통. 아래를 잘라 먹으며 화면만 크게 남는다 */
+  --deck-w: clamp(360px, min(74vw, 155vh), 1600px);
+  --cart-w: calc(var(--deck-w) * 0.24);
+  --cart-h: calc(var(--cart-w) / 0.76);
+  --seat-in: calc(var(--cart-h) * 0.55);   /* 이만큼이 기계 안으로 들어간다 */
 }
 
 * { box-sizing: border-box; }
-
 html, body { height: 100%; }
 
 body {
   margin: 0;
-  background: #263E99;          /* 첫 잉크. 캔버스가 곧바로 덮는다 */
-  color: var(--paper);
   overflow: hidden;
   overscroll-behavior: none;
+  background: var(--ground);
+  color: var(--paper);
+  font-family: var(--mono);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-family: 'Quantico', 'Pretendard Variable', Pretendard, 'Noto Sans KR', sans-serif;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.graph {
+/* 바닥에 깔린 옅은 빛 — 게임기가 놓인 자리 */
+.room {
   position: fixed;
   inset: 0;
-  pointer-events: none;
   overflow: hidden;
+  background:
+    radial-gradient(120% 70% at 50% 84%, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0) 62%),
+    radial-gradient(90% 60% at 50% 22%, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 70%);
+  transition: opacity 200ms ease;
 }
 
-.graph-sheet {
+.room.is-inside { opacity: 0; }
+
+/* ---- 머리말과 꼬리말 -------------------------------------------- */
+
+.hud {
   position: absolute;
-  left: 0;
-  top: 0;
-}
-
-/* ---- 커서 --------------------------------------------------------
-   기본 커서를 감추고 점 하나를 대신 따라다니게 한다.
-   평소에는 Charcoal(순검정보다 한 단계 옅은 먹), 구 위에 오면
-   종이 흰색으로 바뀌면서 커진다 — 고를 수 있다는 신호다. */
-
-:root { touch-action: none; }
-html, body, .graph, .sheet-close, .graph-sheet { cursor: none; }
-
-.cursor {
-  position: fixed;
-  left: 0;
-  top: 0;
-  z-index: 10;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 220ms ease;
-}
-
-.cursor.is-on { opacity: 1; }
-
-.cursor i {
-  display: block;
-  width: 13px;
-  height: 13px;
-  margin: -6.5px 0 0 -6.5px;
-  border-radius: 50%;
-  background: #30343A;            /* Charcoal */
-  transition: background-color 200ms ease,
-              transform 240ms cubic-bezier(0.2, 0.9, 0.3, 1.4);
-}
-
-.cursor.is-over i {
-  background: #FAFAF7;            /* Neutral White — 고를 수 있다 */
-  transform: scale(1.75);
-}
-
-/* ---- 글자 — 레퍼런스 자리 그대로 -------------------------------
-   기준 화면 1512 × 982 에서 잰 값을 비율로 옮겼다.
-   왼쪽 여백 4.5%, 머리말 3.9%, 제목 42.9%, 본문 49.1%, 아래 95.0%.
-   자리를 옮기려면 아래 top/left 만 만지면 된다.
-
-   조판은 mono-color 의 Condensed Civic — 진한 콘덴스드 그로테스크가
-   표제를, 모노스페이스가 사실 정보를 맡는다. */
-
-.head,
-.panel,
-.strip {
-  position: absolute;
-  color: var(--paper);
-  opacity: 0;
-  pointer-events: none;
-  user-select: none;
-  transition: opacity 900ms ease 320ms;
-}
-
-:root.is-ready .head,
-:root.is-ready .panel,
-:root.is-ready .strip { opacity: 1; }
-
-.graph.is-open .head,
-.graph.is-open .panel,
-.graph.is-open .strip { opacity: 0; transition: opacity 300ms ease; }
-
-/* 머리말 — 세 칸이 왼쪽부터 4.5% / 23.9% / 42.3% */
-.head {
   left: 0;
   right: 0;
-  top: 3.9%;
-  height: 1em;
-  font-family: 'Quantico', 'Pretendard Variable', Pretendard, 'Noto Sans KR', sans-serif;
-  font-size: clamp(9px, 0.72vw, 13px);
+  z-index: 6;
+  padding: 0 4.4vw;
+  font-size: clamp(9px, 0.68vw, 12px);
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.head span { position: absolute; top: 0; white-space: nowrap; }
-.head-a { left: 4.5%; letter-spacing: 0.04em; }
-.head-b { left: 23.9%; }
-.head-c { left: 42.3%; }
-
-/* 오른쪽 끝의 작은 고리 */
-.head-mark {
-  left: auto;
-  right: 2.8%;
-  top: -0.1em;
-  width: 0.72em;
-  height: 0.72em;
-  border: 1.5px solid var(--paper);
-  border-radius: 50%;
-}
-
-.panel { left: 0; right: 0; top: 0; bottom: 0; }
-
-.panel-title,
-.panel-desc {
-  position: absolute;
-  left: 4.5%;
-  margin: 0;
-  transition: opacity 200ms ease, transform 200ms ease;
-}
-
-/* 넘어가는 동안 글자는 한 번 물러났다 돌아온다 */
-.panel.is-swap .panel-title,
-.panel.is-swap .panel-desc {
-  opacity: 0;
-  transform: translateY(10px);
-}
-
-.panel-title {
-  top: 42.9%;
-  font-size: clamp(22px, 2.25vw, 40px);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0.01em;
-}
-
-.panel-desc {
-  top: 49.1%;
-  width: 24%;
-  min-width: 15rem;
-  font-family: 'Quantico', 'Pretendard Variable', Pretendard, 'Noto Sans KR', sans-serif;
-  font-size: clamp(11px, 0.82vw, 14px);
-  font-weight: 400;
-  line-height: 1.95;
-  letter-spacing: 0.01em;
-}
-
-/* 아래 — 번호와 배색, 그리고 남은 길이 */
-.strip {
-  left: 4.5%;
-  top: 95.0%;
-  margin: 0;
-  font-family: 'Quantico', 'Pretendard Variable', Pretendard, 'Noto Sans KR', sans-serif;
-  font-size: clamp(9px, 0.72vw, 13px);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  line-height: 1;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.strip-off { opacity: 0.28; }
-
-/* 열린 인터랙션의 닫기 버튼 */
-.sheet-close {
-  position: absolute;
-  top: clamp(1.1rem, 3vw, 2rem);
-  right: clamp(1.1rem, 3vw, 2rem);
-  width: clamp(2rem, 4vw, 2.75rem);
-  height: clamp(2rem, 4vw, 2.75rem);
-  padding: 0;
-  border: 0;
-  background: none;
-  color: #111111;
-  cursor: none;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 320ms ease;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 620ms var(--ease-out) 240ms, transform 620ms var(--ease-out) 240ms;
 }
 
-.graph.is-open .sheet-close {
-  opacity: 1;
-  pointer-events: auto;
+.hud-foot { transform: translateY(6px); }
+
+:root.is-ready .hud { opacity: 1; transform: none; }
+:root.is-leaving .hud { opacity: 0; transition-delay: 0ms; transition-duration: 180ms; }
+
+.hud-top {
+  top: 3.6vh;
+  display: flex;
+  gap: 4.6vw;
+  color: rgba(250,250,247,0.62);
+}
+.hud-top span:last-child { margin-left: auto; color: rgba(250,250,247,0.34); }
+
+.hud-foot { bottom: 31%; }
+
+.now {
+  display: flex;
+  align-items: baseline;
+  gap: 0.9em;
+  margin: 0 0 0.62em;
+}
+.now-no {
+  font-variant-numeric: tabular-nums;
+  color: rgba(250,250,247,0.34);
+}
+.now-title {
+  font-family: var(--serif);
+  font-size: clamp(19px, 1.9vw, 34px);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  line-height: 1;
+}
+.now-sub {
+  margin: 0 0 1.1em;
+  color: rgba(250,250,247,0.42);
+  letter-spacing: 0.12em;
+}
+.hint {
+  margin: 0;
+  color: rgba(250,250,247,0.24);
+  letter-spacing: 0.16em;
 }
 
-.sheet-close svg {
+/* 넘길 때 글자는 한 번 물러났다 돌아온다 */
+.now-title, .now-sub {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+.hud-foot.is-swap .now-title,
+.hud-foot.is-swap .now-sub {
+  opacity: 0;
+  transform: translateY(7px);
+}
+
+/* ---- 확대의 주체 ------------------------------------------------- */
+
+.stage {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+  cursor: grab;
+  touch-action: none;
+  will-change: transform;
+}
+.stage.is-dragging { cursor: grabbing; }
+
+/* ---- 칩 ----------------------------------------------------------
+   같은 크기의 카드가 부채처럼 겹친다. 자리는 script 가 잡는다. */
+
+.rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 34%;
+  height: 0;
+  outline: none;
+  transition: opacity 260ms ease;
+}
+.rail.is-gone { opacity: 0; pointer-events: none; }
+
+.chip {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: var(--w);
+  height: var(--h);
+  margin-left: calc(var(--w) / -2);
+  margin-top: calc(var(--h) / -2);
+  transform-origin: 50% 100%;
+  will-change: transform;
+}
+
+.chip.is-focus { cursor: pointer; }
+.chip.is-hidden { opacity: 0; }
+
+/* 카드 한 장 — 도서관 대출증의 짜임을 게임 칩으로 옮긴다 */
+.face {
+  --r: calc(var(--w) * 0.062);
+  position: relative;
   width: 100%;
   height: 100%;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  fill: none;
+  padding: 7.5% 7.5% 6.5%;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r);
+  background: var(--body);
+  color: var(--fg);
+  font-size: calc(var(--w) * 0.058);
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.16),
+    inset 0 0 0 1px rgba(0,0,0,0.06),
+    0 22px 34px -20px rgba(0,0,0,0.92);
 }
 
-@media (max-width: 860px) {
-  .head-b { display: none; }
-  .head-c { left: auto; right: 9%; }
-  .panel-title { top: auto; bottom: 21%; }
-  .panel-desc  { top: auto; bottom: 9%; width: 84%; }
+/* 칩 위쪽의 잔줄 — 손에 쥐는 자리 */
+.face-grip {
+  display: flex;
+  gap: 0.32em;
+  height: 0.5em;
+  margin-bottom: 1.15em;
+  opacity: 0.42;
+}
+.face-grip i {
+  flex: 1;
+  background: currentColor;
+  border-radius: 0.5px;
+}
+
+.face-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 2.34 / 1;
+}
+
+.face-title {
+  margin: auto 0 0;
+  font-family: var(--serif);
+  font-size: 1.92em;
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: 0.004em;
+}
+.face-title span { display: block; opacity: 0.62; }
+
+.face-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 1.15em;
+  font-size: 0.62em;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  line-height: 1.55;
+}
+.face-meta b { display: block; font-weight: 700; opacity: 0.5; }
+.face-meta em { font-style: normal; font-variant-numeric: tabular-nums; }
+.face-meta > span:last-child { text-align: right; }
+
+.face-sign {
+  display: block;
+  width: 74%;
+  margin-top: 0.5em;
+  fill: none;
+  stroke: #0F0F10;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.92;
+}
+.face-rule {
+  height: 1px;
+  margin-top: 0.25em;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+/* 초점에서 멀어질수록 어둑해진다 — 밝기 대신 검은 막의 투명도로 */
+.face-shade {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r);
+  background: #08080A;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---- 게임기 — Advance -----------------------------------------------
+   가로로 누운 몸통이 화면 아래로 걸쳐 있다. 아래쪽 조작부는 잘려 나가고
+   눈에 남는 것은 카트리지와 화면이다. */
+
+.deck {
+  position: absolute;
+  left: 50%;
+  top: 74%;
+  width: var(--deck-w);
+  margin-left: calc(var(--deck-w) / -2);
+}
+
+/* 위 모서리로 얼굴을 내미는 L·R 어깨 단추 */
+.bump {
+  position: absolute;
+  top: -3.5%;
+  height: 8%;
+  width: 15%;
+  border-radius: 30% 30% 0 0 / 60% 60% 0 0;
+  background: linear-gradient(#C9C7C0, #A9A69D);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+.bump-l { left: 6.5%; }
+.bump-r { right: 6.5%; }
+
+.seat {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--seat-in) - var(--cart-h));
+  z-index: 1;
+  width: var(--cart-w);
+  height: var(--cart-h);
+  margin-left: calc(var(--cart-w) / -2);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+.seat.is-in { opacity: 1; }
+
+.console {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  aspect-ratio: 1.76;
+  border-radius: 17% / 30%;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 55%),
+    linear-gradient(168deg, #E2E0D8 0%, #CFCCC3 34%, #BAB7AE 68%, #A5A29A 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255,255,255,0.75),
+    inset 0 -4px 10px rgba(0,0,0,0.16),
+    0 50px 90px -34px rgba(0,0,0,0.9),
+    0 2px 0 rgba(0,0,0,0.35);
+  will-change: transform;
+}
+
+/* 칩이 들어가는 입 */
+.slot {
+  position: absolute;
+  left: 50%;
+  top: -1px;
+  width: calc(var(--cart-w) + 2.2%);
+  height: 2.6%;
+  margin-left: calc((var(--cart-w) + 2.2%) / -2);
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(#0B0B0C, #2B2B2C);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 -1px 0 rgba(255,255,255,0.14);
+}
+
+.bezel {
+  position: absolute;
+  left: 22%;
+  top: 11%;
+  width: 56%;
+  padding: 2.6%;
+  border-radius: 2.4% / 4.2%;
+  background: linear-gradient(168deg, #3E4147 0%, #292B30 46%, #1B1D20 100%);
+  box-shadow:
+    inset 0 2px 5px rgba(0,0,0,0.55),
+    0 1px 0 rgba(255,255,255,0.5);
+}
+
+.led {
+  position: absolute;
+  left: 18.2%;
+  top: 12.5%;
+  width: 1.2%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #2F4032;
+  box-shadow: inset 0 0 2px rgba(0,0,0,0.6);
+  transition: background-color 260ms ease, box-shadow 260ms ease;
+}
+.led.is-on {
+  background: #4BE06B;
+  box-shadow: 0 0 9px rgba(75,224,107,0.9), inset 0 0 2px rgba(255,255,255,0.6);
+}
+
+.lcd {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  background: #121410;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.6);
+}
+.lcd canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+/* 화소 사이의 실금 */
+.lcd-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.18;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.6) 0 1px, transparent 1px calc(100% / 60)),
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.6) 0 1px, transparent 1px calc(100% / 40));
+}
+.lcd-glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(152deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.03) 26%, rgba(255,255,255,0) 48%);
+}
+
+/* ---- 조작부 — 화면 양옆 ---------------------------------------- */
+
+.dpad {
+  position: absolute;
+  left: 3.5%;
+  top: 22%;
+  width: 14%;
+  aspect-ratio: 1;
+}
+.dpad i {
+  position: absolute;
+  background: linear-gradient(160deg, #3B3C41, #212226);
+  border-radius: 3px;
+  box-shadow: 0 1.5px 0 rgba(255,255,255,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.dpad-v { left: 34%; top: 0; width: 32%; height: 100%; }
+.dpad-h { left: 0; top: 34%; width: 100%; height: 32%; }
+.dpad-dot {
+  left: 40%; top: 40%; width: 20%; height: 20%;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.45) !important;
+  box-shadow: none !important;
+}
+
+.ab {
+  position: absolute;
+  right: 2.5%;
+  top: 24%;
+  display: flex;
+  gap: 9%;
+  width: 18%;
+  transform: rotate(-22deg);
+}
+.btn {
+  position: relative;
+  flex: 1;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: linear-gradient(160deg, #6E6F78, #4A4B53);
+  box-shadow: 0 2px 0 rgba(255,255,255,0.42), inset 0 1px 1px rgba(255,255,255,0.22);
+}
+.btn i {
+  position: absolute;
+  left: 50%;
+  top: 112%;
+  transform: translateX(-50%);
+  font-size: clamp(4px, 0.62vw, 8px);
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #5B5C63;
+}
+
+.soft {
+  position: absolute;
+  right: 4%;
+  top: 40%;
+  display: flex;
+  gap: 10%;
+  width: 15%;
+  transform: rotate(-22deg);
+}
+.pill {
+  position: relative;
+  flex: 1;
+  height: clamp(5px, 0.85vw, 11px);
+  border-radius: 99px;
+  background: linear-gradient(160deg, #74757C, #4E4F56);
+  box-shadow: 0 1.5px 0 rgba(255,255,255,0.42);
+}
+.pill i {
+  position: absolute;
+  left: 50%;
+  top: 145%;
+  transform: translateX(-50%);
+  font-size: clamp(3.4px, 0.5vw, 6.5px);
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #5B5C63;
+  white-space: nowrap;
+}
+
+.mark {
+  position: absolute;
+  left: 10.5%;
+  top: 5.2%;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+  margin: 0;
+  color: #55565C;
+}
+.mark span {
+  font-size: clamp(6px, 0.86vw, 13px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.mark em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: clamp(9px, 1.24vw, 19px);
+  letter-spacing: 0.01em;
+  color: #6B4C86;
+}
+
+.speaker {
+  position: absolute;
+  right: 4%;
+  top: 47%;
+  display: flex;
+  gap: 22%;
+  width: 8%;
+  height: 4.5%;
+  transform: rotate(-22deg);
+}
+.speaker i {
+  flex: 1;
+  border-radius: 99px;
+  background: rgba(0,0,0,0.24);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.45);
+}
+
+/* ---- 날아가는 칩 -------------------------------------------------- */
+
+.flight {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+.flight .face {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--w);
+  height: var(--h);
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+/* ---- 화면 안 ------------------------------------------------------ */
+
+.play {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+.play.is-on { opacity: 1; pointer-events: auto; }
+
+.play canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.play-hud {
+  position: absolute;
+  left: 4.4vw;
+  bottom: 5vh;
+  pointer-events: none;
+  color: var(--play-ink, #111);
+}
+.play-title {
+  margin: 0 0 0.7em;
+  font-family: var(--serif);
+  font-size: clamp(22px, 2.4vw, 42px);
+  line-height: 1;
+}
+.play-hint {
+  margin: 0;
+  font-size: clamp(9px, 0.68vw, 12px);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  opacity: 0.5;
+}
+
+.eject {
+  position: absolute;
+  right: 4.4vw;
+  top: 4.6vh;
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  padding: 0.72em 0.95em;
+  border: 1px solid currentColor;
+  border-radius: 99px;
+  background: none;
+  color: var(--play-ink, #111);
+  font-family: var(--mono);
+  font-size: clamp(9px, 0.66vw, 12px);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  cursor: pointer;
+  opacity: 0.62;
+  transition: opacity 200ms ease, transform 160ms var(--ease-out);
+}
+.eject span { opacity: 0.5; }
+.eject:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) {
+  .eject:hover { opacity: 1; }
+}
+
+/* ---- 작은 화면 ---------------------------------------------------- */
+
+@media (max-width: 720px) {
+  :root {
+    --card-w: clamp(140px, 50vw, 240px);
+    --deck-w: clamp(320px, 118vw, 700px);
+  }
+  .hud-top span:nth-child(2) { display: none; }
+  .rail { top: 32%; }
+  .deck { top: 72%; }
+  .hud-foot { bottom: 33%; }
+}
+
+/* ---- 움직임을 줄여 달라고 한 사람에게 ------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .hud { transition-duration: 200ms; transform: none; }
+  .now-title, .now-sub { transition: opacity 120ms ease; }
+}
+
+/* 칩 한 장의 실제 너비를 재는 자 — clamp() 는 계산된 문자열로만 읽히므로 */
+.probe {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  width: var(--card-w);
+  height: 1px;
+  pointer-events: none;
+}
+
+/* ---- 손에 닿는 느낌 ------------------------------------------------
+   칩의 자리는 script 가 매 프레임 .chip 에 쓴다. 그래서 눌림과 들림은
+   안쪽 .face 에 얹는다 — 서로 덮어쓰지 않는다. */
+
+.face { transition: transform 160ms var(--ease-out); }
+
+@media (hover: hover) and (pointer: fine) {
+  .chip.is-focus:hover .face { transform: translateY(-5px); }
+}
+.chip.is-focus:active .face { transform: scale(0.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  .face { transition: none; }
 }

@@ -3,42 +3,86 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>MONO-COLOR EDITORIAL — Interaction Archive</title>
+  <title>CRAFT BOY — Interaction Cartridges</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Quantico:ital,wght@0,400;0,700;1,400;1,700&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Quantico:ital,wght@0,400;0,700;1,400&display=swap" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="graph" id="graph">
-    <canvas class="graph-sheet" id="sheet" aria-hidden="true"></canvas>
+  <!-- 방 — 선반(칩)과 게임기가 함께 서 있는 자리 -->
+  <div class="room" id="room">
 
-    <!-- 커서 — 기본은 옅은 검정, 구 위에서는 흰색 -->
-    <div class="cursor" id="cursor" aria-hidden="true"><i></i></div>
-
-    <!-- 머리말 — 화면 위를 가로지르는 세 칸과 오른쪽 끝의 점 -->
-    <header class="head">
-      <span class="head-a" id="head-a"></span>
-      <span class="head-b" id="head-b"></span>
-      <span class="head-c" id="head-c"></span>
-      <span class="head-mark" aria-hidden="true"></span>
+    <header class="hud hud-top">
+      <span>INTERACTION ARCHIVE</span>
+      <span>CARTRIDGE LIBRARY</span>
+      <span id="hud-count">06 TITLES</span>
     </header>
 
-    <!-- 왼쪽 — 지금 보고 있는 인터랙션 -->
-    <section class="panel" id="panel" aria-live="polite">
-      <h2 class="panel-title" id="panel-title"></h2>
-      <p class="panel-desc" id="panel-desc"></p>
-    </section>
+    <!-- 확대의 주체 — 여기만 화면 안으로 밀려 들어간다 -->
+    <div class="stage" id="stage">
 
-    <!-- 아래 — 몇 번째인지, 그리고 남은 길이 -->
-    <p class="strip" aria-hidden="true"><span id="strip-num"></span><span class="strip-on" id="strip-on"></span><span class="strip-off" id="strip-off"></span></p>
+      <!-- 칩 — 같은 크기의 카드가 부채처럼 겹친다 -->
+      <div class="rail" id="rail" role="listbox" aria-label="Interaction cartridges" tabindex="0"></div>
 
-    <button class="sheet-close" id="close" type="button" aria-label="Close">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5 L19 19 M19 5 L5 19" /></svg>
-    </button>
+      <!-- 게임기 — 가로로 누운 어드밴스 -->
+      <div class="deck" id="deck">
+        <span class="bump bump-l" aria-hidden="true"></span>
+        <span class="bump bump-r" aria-hidden="true"></span>
+        <div class="seat" id="seat" aria-hidden="true"></div>
+
+        <div class="console" id="console">
+          <span class="slot" aria-hidden="true"></span>
+
+          <div class="bezel">
+            <div class="lcd" id="lcd">
+              <canvas id="lcd-cv"></canvas>
+              <span class="lcd-grid" aria-hidden="true"></span>
+              <span class="lcd-glare" aria-hidden="true"></span>
+            </div>
+          </div>
+
+          <span class="led" id="led" aria-hidden="true"></span>
+
+          <div class="dpad" aria-hidden="true"><i class="dpad-v"></i><i class="dpad-h"></i><i class="dpad-dot"></i></div>
+
+          <div class="ab" aria-hidden="true">
+            <span class="btn"><i>B</i></span>
+            <span class="btn"><i>A</i></span>
+          </div>
+
+          <div class="soft" aria-hidden="true">
+            <span class="pill"><i>SELECT</i></span>
+            <span class="pill"><i>START</i></span>
+          </div>
+
+          <p class="mark"><span>CRAFT BOY</span><em>advance</em></p>
+          <div class="speaker" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="hud hud-foot">
+      <p class="now"><span class="now-no" id="now-no">01</span><span class="now-title" id="now-title"></span></p>
+      <p class="now-sub" id="now-sub"></p>
+      <p class="hint">DRAG TO BROWSE &nbsp;·&nbsp; CLICK TO INSERT</p>
+    </footer>
   </div>
+
+  <!-- 날아가는 칩 한 장이 잠시 머무는 층 -->
+  <div class="flight" id="flight" aria-hidden="true"></div>
+
+  <!-- 화면 안 — 확대가 끝나면 여기서 인터랙션이 돈다 -->
+  <section class="play" id="play" aria-hidden="true">
+    <canvas id="play-cv"></canvas>
+    <div class="play-hud">
+      <p class="play-title" id="play-title"></p>
+      <p class="play-hint" id="play-hint"></p>
+    </div>
+    <button class="eject" id="eject" type="button">EJECT <span>ESC</span></button>
+  </section>
 
   <script src="script.js"></script>
 </body>

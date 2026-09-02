@@ -2,1184 +2,944 @@
   'use strict';
 
   /* ==================================================================
-   * 색 — mono-color 시스템 (github.com/yanliudesign/mono-color-skill)
+   * CRAFT BOY — 인터랙션 카트리지
    *
-   * 종이(substrate)는 잉크로 세지 않는다. 한 화면에 잉크는 최대 두 도.
-   * 진한 도가 바탕을 깔고, 보조 도가 구슬 안에서 내용을 그린다.
-   * 종이는 반드시 드러나 있어야 한다 — 여기서는 구슬 자체가 종이다.
-   * ================================================================ */
-
-  const SUBSTRATE = {
-    white: '#FAFAF7',   // Neutral White — 현대 편집물의 기본
-    gray:  '#E9E9E5',   // Cool Gray — 건축·기술·차분한 브랜딩
-    beige: '#F5F1E8',   // Pale Beige — 촉각적·기록적 주제
-  };
-
-  const INK = {
-    cobalt:        '#2148B8',
-    royalBlue:     '#2058D4',
-    botanicalGreen:'#008A4B',
-    mintGreen:     '#5EB783',
-    terracotta:    '#C65F38',
-    signalRed:     '#C83232',
-    aubergine:     '#63365F',
-    charcoal:      '#30343A',
-    powderBlue:    '#9EB8D3',
-    oxblood:       '#8F3434',
-    ultramarine:   '#263E99',
-    safetyOrange:  '#E55D2B',
-    cyan:          '#159DDA',
-    mintGreen2:    '#5EB783',
-    warmCharcoal:  '#302D2E',
-    brickRed:      '#B64032',
-  };
-
-  /* ==================================================================
-   * 세부 인터랙션 — 구슬 하나가 인터랙션 하나다.
+   *   1. 선반  같은 크기의 칩이 부채처럼 겹쳐 선다. 끌어서 넘긴다.
+   *   2. 삽입  고른 칩이 날아가 게임기 위 홈으로 내려앉는다.
+   *   3. 기동  화면에 불이 들어오고 마크가 내려온다.
+   *   4. 확대  화면 안으로 밀고 들어가면 인터랙션이 시작된다.
    *
-   *   mode    카탈로그의 인쇄 방식 (한 도 / 듀오톤 / 겹쳐 찍기)
-   *   ground  바탕을 까는 진한 도
-   *   accent  구슬 안에서 내용을 그리는 보조 도
-   *   paper   구슬(과 열린 화면)의 종이색
-   *   art     구슬 안에서 도는 장면 (아래 SCENES 의 키)
-   *   piece   눌렀을 때 열리는 인터랙션 (없으면 표지만 열린다)
-   * ================================================================ */
-  const INTERACTIONS = [
-    {
-      title: 'Out of Register',
-      desc: 'Two plates never land in the same place twice. Pull them apart by hand and the overprint darkens where they still meet. Let go and they snap back into register.',
-      palette: 'Ultramarine + Safety Orange',
-      mode: 'overprint duotone',
-      ground: INK.ultramarine,
-      accent: INK.safetyOrange,
-      paper: SUBSTRATE.white,
-      art: 'register',
-      piece: 'register',
-    },
-    {
-      title: 'The Size of the Dot',
-      desc: 'A photograph darkens by the size of its dots, never by more ink. Grow them and shrink them to see how far one plate can travel.',
-      palette: 'Cobalt + Terracotta',
-      mode: 'complementary duotone',
-      ground: INK.cobalt,
-      accent: INK.terracotta,
-      paper: SUBSTRATE.white,
-      art: 'halftone',
-    },
-    {
-      title: 'Room on the Paper',
-      desc: 'What is left blank holds the page up. Type and shape are pushed aside to measure the share the paper keeps for itself.',
-      palette: 'Botanical Green + Oxblood',
-      mode: 'complementary duotone',
-      ground: INK.botanicalGreen,
-      accent: INK.oxblood,
-      paper: SUBSTRATE.beige,
-      art: 'bars',
-    },
-    {
-      title: 'Density of One Ink',
-      desc: 'A single ink, only different densities. Heavy coverage reads near black, sparse screening sits close to the paper. A question of density, not of plates.',
-      palette: 'Signal Red (one ink)',
-      mode: 'pure one-ink',
-      ground: INK.signalRed,
-      accent: INK.signalRed,
-      paper: SUBSTRATE.white,
-      art: 'density',
-    },
-    {
-      title: 'Order of the Plates',
-      desc: 'Which ink goes down first changes the same palette. The second plate settles onto the first, and the overlap takes on a different character.',
-      palette: 'Mint Green + Warm Charcoal',
-      mode: 'chromatic + black',
-      ground: INK.mintGreen,
-      accent: INK.warmCharcoal,
-      paper: SUBSTRATE.gray,
-      art: 'overprint',
-    },
-    {
-      title: 'The Body of a Letter',
-      desc: 'A letter that has stopped being read stays on as a shape. Tracking and weight are pushed until the word turns into a form.',
-      palette: 'Cyan + Brick Red',
-      mode: 'overprint duotone',
-      ground: INK.cyan,
-      accent: INK.brickRed,
-      paper: SUBSTRATE.gray,
-      art: 'type',
-    },
-  ];
-
-  /* ==================================================================
-   * 실루엣 — 레퍼런스에서 그대로 딴 다섯 자리
-   *
-   *   x  화면 너비 대비 자리 (ANCHOR_X 를 기준으로 좌우로 벌어진다)
-   *   y  화면 높이 대비 자리
-   *   r  화면 높이 대비 반지름
-   *
-   * 위아래 끝의 두 자리는 반지름이 0 이다. 구슬이 거기서 오므라들어
-   * 사라지고 거기서 부풀어 올라온다. 그래서 멈춰 섰을 때는 가운데
-   * 다섯만 남고, 그 다섯이 레퍼런스의 실루엣이다.
-   * 형태를 고치려면 이 표만 만지면 된다.
-   * ================================================================ */
-  const CHAIN_PATH = [
-    { x: 0.612, y: -0.220, r: 0.000 },   // 위 끝 — 여기서 오므라들어 사라진다
-    { x: 0.703, y:  0.061, r: 0.090 },
-    { x: 0.816, y:  0.177, r: 0.141 },
-    { x: 0.726, y:  0.502, r: 0.261 },   // ← 초점(메인). 여기가 가장 크다
-    { x: 0.807, y:  0.757, r: 0.168 },   // 아래로 갈수록 작아진다
-    { x: 0.860, y:  0.930, r: 0.138 },
-    { x: 0.780, y:  1.059, r: 0.117 },
-    { x: 0.720, y:  1.580, r: 0.000 },   // 아래 끝 — 여기서 부풀어 올라온다
-  ];
-
-  const CHAIN_FOCUS = 3;      // 지금 보는 인터랙션이 앉는 자리
-  const CHAIN_ANCHOR = 0.726; // 표의 x 가 이 값일 때 화면 ANCHOR_X 에 온다
-  const ANCHOR_X = 0.726;     // 덩어리가 앉는 가로 자리
-  const CHAIN_AR = 1.54;      // 표를 뜬 화면의 가로세로비
-  const CHAIN_FIT = 1.32;     // 화면이 높이의 이 배보다 좁아지면 통째로 줄인다
-
-  /* 크기는 표가 이미 들고 있다. 더 키우거나 좌우로 벌리고 싶으면
-     이 둘만 올린다 — 같이 올려야 물린 정도가 유지된다. */
-  const CHAIN_SCALE  = 1.00;
-  const CHAIN_SPREAD = 1.00;
-
-  const SCROLL_EASE = 0.085;
-  const SCROLL_GAIN = 0.0019;
-  const SCROLL_SNAP = 220;    // 손을 뗀 뒤 제자리로 물리기까지(ms)
-
-  const INTRO_MS = 900;       // 구슬이 부풀어 오르는 시간
-  const INTRO_STEP = 70;      // 자리마다 시차(ms)
-
-  /* 유동 — 구슬은 표의 자리를 스프링으로 뒤따른다.
-     자리마다 힘이 조금씩 달라서 옮겨 다니는 동안 간격이 벌어졌다
-     좁아지고, 그때 이음새가 늘었다 잘록해지며 액체처럼 흐른다.
-     멈추면 정확히 표 위에 앉으므로 실루엣은 그대로다. */
-  const FLOW_K     = 0.130;   // 목표를 따라가는 힘
-  const FLOW_DAMP  = 0.775;   // 감쇠 — 낮을수록 빨리 잦아든다
-  const FLOW_VARY  = 0.45;    // 자리마다 힘을 이만큼 흔든다
-  const FLOW_WOBBLE = 0.075;  // 움직이는 동안 반지름이 출렁이는 폭
-  const FLOW_SNAP  = 0.05;    // 이만큼 붙으면 표 위에 딱 앉힌다
-
-  /* 구슬 안쪽 — 미리보기가 원을 꽉 채운다 */
-  const ART_SIZE = 360;
-
-  /* 구 안쪽 — 바탕과 같은 색인데 더 밝고 쨍하다.
-     무늬는 종이 흰색으로 뚫린다. 두 값만 만지면 세기가 바뀐다. */
-  const ORB_LIGHT = 0.20;   // 바탕보다 이만큼 밝게
-  const ORB_SAT   = 0.42;   // 이만큼 더 쨍하게
-
-  /* 미리보기의 가장자리를 어디서부터 흐릴지.
-     메인은 흐리지 않아서 제 원 그대로 또렷하고,
-     끝으로 갈수록 부드러워져 이웃과 서로 녹아든다. */
-  const ART_EDGE_MAIN = 0.99;
-  const ART_EDGE_END  = 0.55;
-  const ART_EDGE_SPAN = 2.4;    // 몇 자리 만에 끝값에 닿는지
-
-  /* 메타볼 — 이웃한 구슬은 오목한 목으로 이어져 한 덩어리가 된다 */
-  const GOO_SPREAD = 1.70;
-  const GOO_HANDLE = 2.40;
-
-  /* 바닥 — 바탕 잉크의 밀도만 낮춘 곡선 하나. 도수를 늘리지 않는다 */
-  const FLOOR_CX = 0.62;
-  const FLOOR_CY = 0.784;
-  const FLOOR_RX = 0.90;
-  const FLOOR_RY = 0.374;
-  const FLOOR_INK = 0.13;     // 바닥이 얼마나 더 짙은지
-
-  const OPEN_MS  = 950;       // 물방울이 화면을 덮는 시간
-  const TAP_SLOP = 6;
-
-  /* 어긋난 판 — 열리는 인터랙션 */
-  const REG_SPRING = 0.16;
-  const REG_DAMP   = 0.78;
-  const REG_RANGE  = 0.13;    // 최대로 벌어지는 폭 (화면 짧은 쪽 대비)
-
-  /* 구슬 속 장면에 쓰는 글자들 */
-  const FILL_CHARS = (
-    'abcdefghijklmnopqrstuvwxyz' +
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZ' +
-    '0123456789'
-  ).split('');
-
-  /* ==================================================================
-   * 유틸
+   * 움직임의 기준은 emilkowalski/skills 를 따른다. transform 과 opacity
+   * 만 움직이고, 자주 하는 동작(넘기기)은 짧게, 드물게 보는 장면(삽입·
+   * 확대)만 길게 간다. 도중에 아무 키나 누르면 끝으로 건너뛴다.
    * ================================================================ */
 
   const TAU = Math.PI * 2;
-  const HALF_PI = Math.PI / 2;
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-  const easeOut = (t) => 1 - Math.pow(1 - t, 3);
-  const wrap = (n) => ((n % INTERACTIONS.length) + INTERACTIONS.length) % INTERACTIONS.length;
+  const lerp = (a, b, t) => a + (b - a) * t;
 
-  function rgbOf(hex) {
-    const n = parseInt(hex.slice(1), 16);
-    return [n >> 16, (n >> 8) & 255, n & 255];
-  }
-  function mixRGB(a, b, t) {
-    return [
-      Math.round(a[0] + (b[0] - a[0]) * t),
-      Math.round(a[1] + (b[1] - a[1]) * t),
-      Math.round(a[2] + (b[2] - a[2]) * t),
-    ];
-  }
-  /* 바탕 잉크를 그대로 두고 밝기와 채도만 올린다 —
-     같은 색인데 한 단계 쨍한 면이 된다 */
-  function rgbToHsl(c) {
-    const r = c[0] / 255, g = c[1] / 255, b = c[2] / 255;
-    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-    const l = (mx + mn) / 2;
-    if (mx === mn) return [0, 0, l];
-    const d = mx - mn;
-    const sat = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
-    let h;
-    if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
-    else if (mx === g) h = (b - r) / d + 2;
-    else h = (r - g) / d + 4;
-    return [h / 6, sat, l];
-  }
-
-  function hslToRgb(h, s, l) {
-    if (s === 0) { const v = Math.round(l * 255); return [v, v, v]; }
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-    const p = 2 * l - q;
-    const f = (t) => {
-      if (t < 0) t += 1;
-      if (t > 1) t -= 1;
-      if (t < 1 / 6) return p + (q - p) * 6 * t;
-      if (t < 1 / 2) return q;
-      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-      return p;
-    };
-    return [Math.round(f(h + 1 / 3) * 255), Math.round(f(h) * 255), Math.round(f(h - 1 / 3) * 255)];
-  }
-
-  /* 채도는 언제나 끝까지 올린다. 밝기는 바탕이 어두우면 올리고
-     밝으면 내린다 — 밝은 바탕에서 더 밝히면 하얗게 바래기만 한다. */
-  function vividOf(c) {
-    const hsl = rgbToHsl(c);
-    const sat = clamp(hsl[1] + ORB_SAT, 0.6, 1);
-    const li = hsl[2] < 0.52
-      ? Math.min(0.72, hsl[2] + ORB_LIGHT)
-      : Math.max(0.30, hsl[2] - ORB_LIGHT);
-    return hslToRgb(hsl[0], sat, li);
-  }
-
-  const rgba = (c, a) => 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a.toFixed(3) + ')';
-  const rgbs = (c) => 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
-
-  // 색은 한 번만 풀어 둔다
-  for (const it of INTERACTIONS) {
-    it.gRGB = rgbOf(it.ground);
-    it.aRGB = rgbOf(it.accent);
-    it.pRGB = rgbOf(it.paper);
-  }
-
-  /* ==================================================================
-   * DOM
-   * ================================================================ */
-
-  const rootEl = document.documentElement;
-  const graphEl = document.getElementById('graph');
-  const cv = document.getElementById('sheet');
-  const cx = cv.getContext('2d');
-  const closeEl = document.getElementById('close');
-  const cursorEl = document.getElementById('cursor');
-
-  const panelEl = document.getElementById('panel');
-  const panelTitleEl = document.getElementById('panel-title');
-  const panelDescEl = document.getElementById('panel-desc');
-  const headAEl = document.getElementById('head-a');
-  const headBEl = document.getElementById('head-b');
-  const headCEl = document.getElementById('head-c');
-  const stripNumEl = document.getElementById('strip-num');
-  const stripOnEl = document.getElementById('strip-on');
-  const stripOffEl = document.getElementById('strip-off');
-
-  // 구슬 안 장면을 여기에 굽고 옮겨 그린다
-  const art = document.createElement('canvas');
-  const ax = art.getContext('2d');
-  art.width = art.height = ART_SIZE;
-
-  // 덩어리 가장자리 밀도를 굽는 곳
-  const shade = document.createElement('canvas');
-  const hx = shade.getContext('2d');
-
-  // 바탕은 색이 바뀔 때만 다시 굽는다
-  const room = document.createElement('canvas');
-  const rx = room.getContext('2d');
-  const ROOM_SCALE = 0.5;
-  let roomKey = '';
-
-  let graphW = 0, graphH = 0, dpr = 1;
-  let unit = 0, halfDiag = 1, shapeS = 1;
-
-  let beads = [];
-  const bySlot = new Map();
-  let order = [];
-  const hot = {};
-
-  let started = 0, lastNow = 0;
-  let scroll = 0, scrollTo = 0, scrollAt = 0;
-  let lastScroll = 0, flowRun = 0;
-  let shownIndex = -1, panelTimer = 0;
-  let hoverSlot = null;
-  let drag = null;
-
-  const open = { t: 0, dir: 0, x: 0, y: 0, r0: 26, it: null };
-  const flow = new Map();   // 자리 번호 → 스프링 상태
-  let inkNow = null;        // 지금 화면에 깔린 색
-
-  function sizeCanvas() {
-    dpr = Math.min(2, window.devicePixelRatio || 1);
-    graphW = innerWidth;
-    graphH = innerHeight;
-    cv.width = Math.round(graphW * dpr);
-    cv.height = Math.round(graphH * dpr);
-    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    cv.style.width = graphW + 'px';
-    cv.style.height = graphH + 'px';
-    cx.textAlign = 'center';
-    cx.textBaseline = 'middle';
-
-    unit = Math.min(graphW, graphH);
-    halfDiag = Math.hypot(graphW, graphH) * 0.5;
-    shapeS = Math.min(graphH, graphW / CHAIN_FIT);
-    roomKey = '';
-    plateKey = '';
-  }
-
-  /* ==================================================================
-   * 구슬 기둥 — 좌표표 위를 흐른다
-   * ================================================================ */
-
-  function pathX(px) {
-    return graphW * ANCHOR_X + (px - CHAIN_ANCHOR) * CHAIN_SPREAD * CHAIN_AR * shapeS;
-  }
-
-  const catmull = (a, b, c, d, t) => {
-    const t2 = t * t, t3 = t2 * t;
-    return 0.5 * (2 * b + (c - a) * t
-      + (2 * a - 5 * b + 4 * c - d) * t2
-      + (3 * b - 3 * c + d - a) * t3);
+  const EASE = {
+    out:    'cubic-bezier(0.23, 1, 0.32, 1)',
+    inOut:  'cubic-bezier(0.77, 0, 0.175, 1)',
+    drawer: 'cubic-bezier(0.32, 0.72, 0, 1)',
   };
 
-  function pathAt(t) {
-    const P = CHAIN_PATH, n = P.length;
-    if (t < 0 || t > n - 1) return null;
-    const i = Math.min(n - 2, Math.floor(t));
-    const u = t - i;
-    const p0 = P[Math.max(0, i - 1)], p1 = P[i];
-    const p2 = P[i + 1], p3 = P[Math.min(n - 1, i + 2)];
-    return {
-      x: pathX(catmull(p0.x, p1.x, p2.x, p3.x, u)),
-      y: (catmull(p0.y, p1.y, p2.y, p3.y, u) - 0.5) * shapeS + graphH * 0.5,
-      r: catmull(p0.r, p1.r, p2.r, p3.r, u) * CHAIN_SCALE * shapeS,
-    };
-  }
+  const MS = {
+    flight: 520,   // 칩이 홈 위까지 날아가는 시간
+    seat:   340,   // 홈으로 내려앉는 시간
+    power:  220,   // 화면에 불이 드는 시간
+    boot:   760,   // 마크가 내려와 머무는 시간
+    zoom:   780,   // 화면 안으로 들어가는 시간
+    fade:   200,   // 도트가 실물로 바뀌는 순간
+    out:    620,   // 되돌아 나오는 시간
+  };
 
-  /* 처음 들어올 때 가운데부터 차례로 부풀어 오른다 */
-  function grown(n, t) {
-    const g = clamp((t - Math.min(6, Math.abs(n)) * INTRO_STEP) / INTRO_MS, 0, 1);
-    return easeOut(g) * (1 + 0.07 * Math.sin(g * TAU) * (1 - g));
-  }
+  const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* 자리마다 조금씩 다른 스프링 — 흔들리지 않게 번호로 뽑는다 */
-  function flowOf(n, x, y, r) {
-    let st = flow.get(n);
-    if (!st) {
-      const h = Math.abs(Math.sin(n * 12.9898) * 43758.5453) % 1;
-      st = { x, y, r, vx: 0, vy: 0, vr: 0,
-             k: FLOW_K * (1 - FLOW_VARY / 2 + h * FLOW_VARY),
-             ph: h * TAU };
-      flow.set(n, st);
-    }
-    return st;
-  }
+  const FACE_FONT = "'Quantico', 'Pretendard Variable', Pretendard, sans-serif";
+  const GLYPHS = 'AERTNSOMU0123456789@#%&*';
 
-  function layoutBeads(t, dt) {
-    beads.length = 0;
-    bySlot.clear();
-
-    // 스크롤이 얼마나 빠른지 — 움직일 때만 형태가 출렁인다
-    const speed = Math.abs(scroll - lastScroll);
-    lastScroll = scroll;
-    flowRun += (Math.min(1, speed / 0.018) - flowRun) * Math.min(1, dt / 90);
-
-    const base = Math.floor(scroll);
-    const lo = base - CHAIN_FOCUS - 2, hi = base + CHAIN_PATH.length + 1;
-    for (const n of flow.keys()) if (n < lo || n > hi) flow.delete(n);
-
-    for (let n = base - CHAIN_FOCUS - 1; n <= base + CHAIN_PATH.length; n++) {
-      const p = pathAt(n - scroll + CHAIN_FOCUS);
-      if (!p) { flow.delete(n); continue; }
-
-      const tr = p.r * grown(n, t);
-      const st = flowOf(n, p.x, p.y, tr);
-
-      // 표를 뒤따른다. 자리마다 힘이 달라 간격이 늘었다 좁아진다
-      st.vx = (st.vx + (p.x - st.x) * st.k) * FLOW_DAMP;
-      st.vy = (st.vy + (p.y - st.y) * st.k) * FLOW_DAMP;
-      st.vr = (st.vr + (tr - st.r) * st.k) * FLOW_DAMP;
-      st.x += st.vx; st.y += st.vy; st.r += st.vr;
-
-      // 다 잦아들면 표 위에 딱 앉힌다 — 멈춘 실루엣은 표 그대로다
-      if (Math.abs(p.x - st.x) < FLOW_SNAP && Math.abs(st.vx) < FLOW_SNAP) { st.x = p.x; st.vx = 0; }
-      if (Math.abs(p.y - st.y) < FLOW_SNAP && Math.abs(st.vy) < FLOW_SNAP) { st.y = p.y; st.vy = 0; }
-      if (Math.abs(tr - st.r) < FLOW_SNAP && Math.abs(st.vr) < FLOW_SNAP) { st.r = tr; st.vr = 0; }
-
-      // 움직이는 동안만 숨을 쉰다
-      const r = st.r * (1 + FLOW_WOBBLE * flowRun * Math.sin(t * 0.0042 + st.ph));
-      if (r < 1) continue;
-      if (st.x + r < -80 || st.x - r > graphW + 80) continue;
-      if (st.y + r < -80 || st.y - r > graphH + 80) continue;
-
-      const idx = wrap(n);
-      const b = { n, i: idx, it: INTERACTIONS[idx], x: st.x, y: st.y, r,
-                  near: clamp(1 - Math.abs(n - scroll) * 0.8, 0, 1) };
-      beads.push(b);
-      bySlot.set(n, b);
-    }
-    order = beads.slice().sort((a, b) => a.r - b.r);
-  }
+  /* ---- 잉크 — 한 화면에 두 도까지 ---------------------------------- */
+  const INK = {
+    ultramarine: '#263E99', safetyOrange: '#E55D2B',
+    cobalt: '#2148B8', terracotta: '#C65F38',
+    botanicalGreen: '#008A4B', oxblood: '#8F3434',
+    signalRed: '#C83232',
+    mintGreen: '#5EB783', warmCharcoal: '#302D2E',
+    cyan: '#159DDA', brickRed: '#B64032',
+  };
+  const PAPER = { white: '#FAFAF7', gray: '#E9E9E5', beige: '#F5F1E8' };
 
   /* ==================================================================
-   * 바탕 — 쨍한 잉크 한 도. 바닥은 같은 잉크의 밀도만 올린다
+   * 카트리지 여섯 장
+   *   body/fg  칩(과 카트리지)의 몸과 그 위의 글자
+   *   ink/paper 화면 안에서 쓰는 잉크와 종이
    * ================================================================ */
-
-  /* 색은 지금 깔린 색에서 고른 인터랙션의 색으로 곧장 건너간다.
-     사이에 놓인 인터랙션들의 색을 차례로 거치지 않는다. */
-  let fadeFrom = null, fadeTo = 0, fadeAt = 0, fadeDur = 1;
-
-  function nowColors(now) {
-    const aim = wrap(Math.round(scrollTo));
-    if (!fadeFrom) {
-      const A = INTERACTIONS[aim];
-      fadeFrom = { ground: A.gRGB, accent: A.aRGB, paper: A.pRGB };
-      fadeTo = aim; fadeAt = now; fadeDur = 1;
-    }
-    if (aim !== fadeTo) {
-      fadeFrom = inkNow;                     // 지금 화면에 깔린 색에서 이어 간다
-      fadeTo = aim;
-      fadeAt = now;
-      fadeDur = clamp(420 + 130 * Math.abs(scrollTo - scroll), 420, 1100);
-    }
-
-    let p = clamp((now - fadeAt) / fadeDur, 0, 1);
-    p = p * p * (3 - 2 * p);
-    const B = INTERACTIONS[fadeTo];
-    const ground = mixRGB(fadeFrom.ground, B.gRGB, p);
-    inkNow = {
-      ground,
-      accent: mixRGB(fadeFrom.accent, B.aRGB, p),
-      paper:  mixRGB(fadeFrom.paper,  B.pRGB, p),
-      orb:    vividOf(ground),          // 구 안쪽 — 바탕과 같은 색, 한 단계 쨍하게
-    };
-    return inkNow;
-  }
-
-  function floorEdge(f) {
-    const cxp = FLOOR_CX * graphW;
-    const cyp = FLOOR_CY * graphH + FLOOR_RY * graphH;
-    const rxp = FLOOR_RX * graphW, ryp = FLOOR_RY * graphH;
-    const u = clamp((f * graphW - cxp) / rxp, -1, 1);
-    return cyp - ryp * Math.sqrt(1 - u * u);
-  }
-
-  function bakeRoom(col, W, H) {
-    // 한 도를 고르게 깐다. 위가 아주 살짝 옅어 공간이 열린다
-    const g = rx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, rgbs(mixRGB(col.ground, col.paper, 0.10)));
-    g.addColorStop(0.58, rgbs(col.ground));
-    g.addColorStop(1, rgbs(mixRGB(col.ground, [0, 0, 0], 0.10)));
-    rx.fillStyle = g;
-    rx.fillRect(0, 0, W, H);
-
-    // 바닥 — 같은 잉크를 한 겹 더 얹는다. 선은 긋지 않는다
-    const kh = H / graphH;
-    rx.beginPath();
-    rx.moveTo(0, floorEdge(0) * kh);
-    for (let i = 1; i <= 48; i++) rx.lineTo((i / 48) * W, floorEdge(i / 48) * kh);
-    rx.lineTo(W, H);
-    rx.lineTo(0, H);
-    rx.closePath();
-    rx.fillStyle = 'rgba(0,0,0,' + FLOOR_INK.toFixed(3) + ')';
-    rx.fill();
-  }
-
-  function drawRoom(col) {
-    const key = col.ground.join() + '|' + col.paper.join() + '|' + graphW + 'x' + graphH;
-    if (key !== roomKey) {
-      roomKey = key;
-      room.width = Math.max(2, Math.round(graphW * ROOM_SCALE));
-      room.height = Math.max(2, Math.round(graphH * ROOM_SCALE));
-      bakeRoom(col, room.width, room.height);
-    }
-    cx.drawImage(room, 0, 0, graphW, graphH);
-  }
-  /* 이음새를 현재 path 에 얹는다 (beginPath 하지 않는다) */
-  function neckSubPath(g, c1, c2) {
-    const dx = c2.x - c1.x, dy = c2.y - c1.y;
-    const d = Math.hypot(dx, dy);
-    const r1 = c1.r, r2 = c2.r;
-    const gap = Math.abs(r1 - r2);
-    const maxD = (r1 + r2) * GOO_SPREAD;
-    if (!d || d >= maxD || d <= gap) return;
-
-    // 멀어질수록 목이 가늘어지다가 끊어진다
-    const sep = clamp((d - gap) / (maxD - gap), 0, 1);
-    const v = 0.5 * (1 - sep * sep);
-    if (v < 0.02) return;
-
-    let u1 = 0, u2 = 0;
-    if (d < r1 + r2) {                       // 두 원이 이미 물려 있다
-      u1 = Math.acos(clamp((r1 * r1 + d * d - r2 * r2) / (2 * r1 * d), -1, 1));
-      u2 = Math.acos(clamp((r2 * r2 + d * d - r1 * r1) / (2 * r2 * d), -1, 1));
-    }
-
-    const A = Math.atan2(dy, dx);
-    const maxSpread = Math.acos(clamp((r1 - r2) / d, -1, 1));
-
-    const a1 = A + u1 + (maxSpread - u1) * v;
-    const a2 = A - u1 - (maxSpread - u1) * v;
-    const a3 = A + Math.PI - u2 - (Math.PI - u2 - maxSpread) * v;
-    const a4 = A - Math.PI + u2 + (Math.PI - u2 - maxSpread) * v;
-
-    const p1x = c1.x + Math.cos(a1) * r1, p1y = c1.y + Math.sin(a1) * r1;
-    const p2x = c1.x + Math.cos(a2) * r1, p2y = c1.y + Math.sin(a2) * r1;
-    const p3x = c2.x + Math.cos(a3) * r2, p3y = c2.y + Math.sin(a3) * r2;
-    const p4x = c2.x + Math.cos(a4) * r2, p4y = c2.y + Math.sin(a4) * r2;
-
-    const total = r1 + r2;
-    const k = Math.min(v * GOO_HANDLE, Math.hypot(p3x - p1x, p3y - p1y) / total)
-            * Math.min(1, d * 2 / total);
-    const h1 = r1 * k, h2 = r2 * k;
-
-    // 조종점 네 개
-    const H1x = p1x + Math.cos(a1 - HALF_PI) * h1, H1y = p1y + Math.sin(a1 - HALF_PI) * h1;
-    const H2x = p2x + Math.cos(a2 + HALF_PI) * h1, H2y = p2y + Math.sin(a2 + HALF_PI) * h1;
-    const H3x = p3x + Math.cos(a3 + HALF_PI) * h2, H3y = p3y + Math.sin(a3 + HALF_PI) * h2;
-    const H4x = p4x + Math.cos(a4 - HALF_PI) * h2, H4y = p4y + Math.sin(a4 - HALF_PI) * h2;
-
-    // 원과 같은 방향으로 감아야 nonzero 에서 합집합이 된다.
-    // 거꾸로 감으면 겹치는 자리가 서로 상쇄돼 구멍이 뚫린다.
-    g.moveTo(p1x, p1y);
-    g.arc(c1.x, c1.y, r1, a1, a2, true);
-    g.bezierCurveTo(H2x, H2y, H4x, H4y, p4x, p4y);
-    g.arc(c2.x, c2.y, r2, a4, a3, true);
-    g.bezierCurveTo(H3x, H3y, H1x, H1y, p1x, p1y);
-    g.closePath();
-  }
-
-  /* 덩어리 전체를 g 의 현재 path 로 만든다. grow 만큼 부풀릴 수 있다 */
-  function silhouette(grow, g) {
-    g = g || cx;
-    g.beginPath();
-    for (const b of beads) {
-      const r = b.r + grow;
-      if (r <= 0.3) continue;
-      g.moveTo(b.x + r, b.y);
-      g.arc(b.x, b.y, r, 0, TAU);
-    }
-    for (let i = 0; i < beads.length - 1; i++) {
-      const a = beads[i], c = beads[i + 1];
-      if (c.n !== a.n + 1) continue;
-      neckSubPath(g,
-        { x: a.x, y: a.y, r: a.r + grow },
-        { x: c.x, y: c.y, r: c.r + grow });
-    }
-  }
-
-  /* 덩어리를 감싸는 화면 위 사각형 */
-  function chainBox(pad) {
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const b of beads) {
-      x0 = Math.min(x0, b.x - b.r); x1 = Math.max(x1, b.x + b.r);
-      y0 = Math.min(y0, b.y - b.r); y1 = Math.max(y1, b.y + b.r);
-    }
-    x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad);
-    x1 = Math.min(graphW, x1 + pad); y1 = Math.min(graphH, y1 + pad);
-    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
-  }
+  const CARTS = [
+    {
+      no: '01', title: 'Out of Register', scene: 'register',
+      mode: 'OVERPRINT', palette: 'ULTRAMARINE + SAFETY ORANGE',
+      hint: 'DRAG TO PULL THE PLATES APART',
+      body: INK.ultramarine, fg: PAPER.white,
+      ink: INK.ultramarine, paper: PAPER.white,
+    },
+    {
+      no: '02', title: 'The Size of the Dot', scene: 'halftone',
+      mode: 'DUOTONE', palette: 'COBALT + TERRACOTTA',
+      hint: 'MOVE TO GROW THE DOTS',
+      body: INK.terracotta, fg: PAPER.beige,
+      ink: INK.cobalt, paper: PAPER.white,
+    },
+    {
+      no: '03', title: 'Room on the Paper', scene: 'bars',
+      mode: 'DUOTONE', palette: 'BOTANICAL GREEN + OXBLOOD',
+      hint: 'MOVE TO PUSH THE TYPE ASIDE',
+      body: INK.botanicalGreen, fg: PAPER.beige,
+      ink: INK.botanicalGreen, paper: PAPER.beige,
+    },
+    {
+      no: '04', title: 'Density of One Ink', scene: 'density',
+      mode: 'ONE INK', palette: 'SIGNAL RED',
+      hint: 'MOVE UP AND DOWN TO SET THE DENSITY',
+      body: INK.signalRed, fg: PAPER.white,
+      ink: INK.signalRed, paper: PAPER.white,
+    },
+    {
+      no: '05', title: 'Order of the Plates', scene: 'overprint',
+      mode: 'CHROMATIC + BLACK', palette: 'MINT GREEN + WARM CHARCOAL',
+      hint: 'MOVE TO CHANGE WHICH PLATE LANDS FIRST',
+      body: INK.mintGreen, fg: INK.warmCharcoal,
+      ink: INK.warmCharcoal, paper: PAPER.gray,
+    },
+    {
+      no: '06', title: 'The Body of a Letter', scene: 'type',
+      mode: 'OVERPRINT', palette: 'CYAN + BRICK RED',
+      hint: 'MOVE TO UNSETTLE THE LETTERS',
+      body: INK.cyan, fg: PAPER.white,
+      ink: INK.brickRed, paper: PAPER.gray,
+    },
+  ];
 
   /* ==================================================================
-   * 종이 — 덩어리는 잉크가 아니라 종이다.
-   * 바탕이 잉크 한 도이므로 구슬이 곧 드러난 종이 노릇을 한다.
-   * ================================================================ */
-
-  /* 덩어리 가장자리로 지는 그림자.
-     합집합 path 를 stroke 하면 안쪽에 숨은 원호까지 그어져 구슬이
-     다시 나뉘어 보인다. 그래서 실루엣을 통째로 칠한 뒤, 흐리게
-     한 겹 파내서 테두리에만 어둠이 남게 한다. */
-  function innerShadow(box, blur, alpha) {
-    if (box.w < 6 || box.h < 6) return;
-
-    const k = 0.5;                       // 그림자는 흐리니 절반이면 충분하다
-    const w = Math.ceil(box.w * k), h = Math.ceil(box.h * k);
-    if (shade.width < w || shade.height < h) { shade.width = w; shade.height = h; }
-    hx.setTransform(1, 0, 0, 1, 0, 0);
-    hx.clearRect(0, 0, shade.width, shade.height);
-    hx.setTransform(k, 0, 0, k, -box.x * k, -box.y * k);
-
-    hx.fillStyle = rgba(shadeInk, alpha);
-    silhouette(0, hx);
-    hx.fill();
-
-    hx.globalCompositeOperation = 'destination-out';
-    hx.filter = 'blur(' + (blur * k).toFixed(1) + 'px)';
-    silhouette(-blur * 0.25, hx);
-    hx.fill();
-    hx.filter = 'none';
-    hx.globalCompositeOperation = 'source-over';
-
-    cx.drawImage(shade, 0, 0, w, h, box.x, box.y, box.w, box.h);
-  }
-
-  /* 종이는 평평하다. 유리처럼 반사시키지 않고, 가장자리에만
-     같은 잉크를 아주 옅게 얹어 종이가 살짝 말린 것처럼 둔다. */
-  let shadeInk = [0, 0, 0];
-
-  function shadeChain(box, col) {
-    shadeInk = mixRGB(col.ground, [0, 0, 0], 0.35);
-    let span = 0;
-    for (const b of beads) span = Math.max(span, b.r);
-    if (span > 8) innerShadow(box, Math.max(4, span * 0.22), 0.26);
-  }
-
-  /* 덩어리 한 장 — 테두리 한 겹을 깔고, 채우고, 안에 미리보기를 깐다.
-     stroke 를 쓰지 않는 것이 요점이다. 부풀린 실루엣을 먼저 칠하면
-     바깥 경계 하나만 생기고 안쪽에는 선이 남지 않는다. */
-  function drawChain(t, col) {
-    if (!beads.length) return;
-
-    const box = chainBox(2);
-
-    silhouette(0, cx);
-    cx.save();
-    cx.fillStyle = rgbs(col.orb);
-    cx.fill();
-    cx.clip();
-
-    // 미리보기는 원을 꽉 채우되 가장자리만 흐리다.
-    // 그래서 겹치는 자리에서 서로 녹아들고 구슬 경계가 남지 않는다.
-    for (const b of order) {
-      if (b.r < 5) continue;
-      const away = clamp(Math.abs(b.n - scroll) / ART_EDGE_SPAN, 0, 1);
-      paintArt(b.it, t, col, ART_EDGE_MAIN + (ART_EDGE_END - ART_EDGE_MAIN) * away);
-      cx.globalAlpha = Math.min(1, b.r / 12);
-      cx.drawImage(art, b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
-      cx.globalAlpha = 1;
-    }
-
-    shadeChain(box, col);
-    cx.restore();
-  }
-
-
-  /* ==================================================================
-   * 구슬 안 — 종이 위에 보조 잉크로 찍은 한 장면
+   * 장면 — 칩 위의 무늬, 화면 속 도트, 확대된 실물이 모두 같은 함수다.
+   * 크기만 바뀐다.
    *
-   * 잉크는 한 도뿐이다. 짙고 옅은 것은 밀도(망점 크기)로만 낸다.
+   *   g  캔버스, W×H  그리는 크기, t  시간(ms), ink  잉크 한 도
+   *   p  손의 자리 { x, y: 0..1, dx, dy: -1..1, down }
    * ================================================================ */
 
-  function ch(n) {
-    return FILL_CHARS[((n % FILL_CHARS.length) + FILL_CHARS.length) % FILL_CHARS.length];
-  }
+  const IDLE = { x: 0.5, y: 0.5, dx: 0, dy: 0, down: false };
 
   const SCENES = {
-    // 어긋난 판 — 같은 도형이 두 번, 조금 밀려서
-    register(g, S, t, ink) {
-      const d = S * (0.055 + 0.022 * Math.sin(t * 0.0009));
+    // 어긋난 판 — 같은 그림이 두 번, 조금 밀려서
+    register(g, W, H, t, ink, p) {
+      const S = Math.min(W, H);
+      const ox = p.dx * S * 0.30 + Math.sin(t * 0.0006) * S * 0.014;
+      const oy = p.dy * S * 0.30 + Math.cos(t * 0.0008) * S * 0.014;
+      g.fillStyle = ink;
+      g.strokeStyle = ink;
+      g.lineWidth = S * 0.017;
       for (let k = 0; k < 2; k++) {
-        g.globalAlpha = k ? 0.45 : 0.85;
-        g.fillStyle = ink;
+        const s = k ? 0.5 : -0.5;
+        g.globalAlpha = 0.56;
         g.beginPath();
-        g.arc(S / 2 + (k ? d : -d), S / 2 + (k ? d * 0.6 : -d * 0.6), S * 0.26, 0, TAU);
+        g.arc(W * 0.5 + ox * s, H * 0.40 + oy * s, S * 0.19, 0, TAU);
         g.fill();
+        for (let i = 0; i < 3; i++) {
+          const y = H * 0.66 + i * S * 0.082 + oy * s;
+          g.beginPath();
+          g.moveTo(W * 0.14 + ox * s, y);
+          g.lineTo(W * 0.86 + ox * s, y);
+          g.stroke();
+        }
       }
       g.globalAlpha = 1;
-      g.strokeStyle = ink;
-      g.lineWidth = S * 0.012;
-      for (let i = 0; i < 3; i++) {
-        g.beginPath();
-        g.moveTo(S * 0.12, S * (0.72 + i * 0.075));
-        g.lineTo(S * 0.88 - d * (i + 1), S * (0.72 + i * 0.075));
-        g.stroke();
-      }
     },
 
     // 망점 — 점의 크기로만 어두워진다
-    halftone(g, S, t, ink) {
-      const n = 13, w = S / n;
+    halftone(g, W, H, t, ink, p) {
+      const cell = Math.min(W, H) / 9.5;
+      const cols = Math.max(2, Math.round(W / cell));
+      const rows = Math.max(2, Math.round(H / cell));
+      const cw = W / cols, ch = H / rows;
+      const px = p.x * W, py = p.y * H;
+      const reach = Math.hypot(W, H) * 0.56;
       g.fillStyle = ink;
-      for (let r = 0; r < n; r++) {
-        for (let c = 0; c < n; c++) {
-          const dx = (c + 0.5) / n - 0.5, dy = (r + 0.5) / n - 0.5;
-          const dist = Math.hypot(dx, dy) * 2;
-          const v = clamp(1 - dist + 0.28 * Math.sin(t * 0.0011 - dist * 5), 0, 1);
-          if (v <= 0.02) continue;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x = (c + 0.5) * cw, y = (r + 0.5) * ch;
+          const d = Math.hypot(x - px, y - py) / reach;
+          const v = clamp(1.04 - d + 0.2 * Math.sin(t * 0.0012 - d * 5.5), 0, 1);
+          if (v < 0.04) continue;
           g.beginPath();
-          g.arc(c * w + w / 2, r * w + w / 2, w * 0.5 * Math.sqrt(v), 0, TAU);
+          g.arc(x, y, Math.min(cw, ch) * 0.5 * Math.sqrt(v), 0, TAU);
           g.fill();
         }
       }
     },
 
     // 여백 — 막대가 밀리며 종이를 드러낸다
-    bars(g, S, t, ink) {
-      const n = 11, h = S / n;
+    bars(g, W, H, t, ink, p) {
+      const rows = 11, h = H / rows;
+      const push = (p.x - 0.5) * 2;
       g.fillStyle = ink;
-      for (let r = 0; r < n; r++) {
-        const d = Math.sin(t * 0.0009 + r * 0.7) * S * 0.26;
-        const w = S * (0.30 + 0.30 * Math.abs(Math.sin(r * 1.3)));
-        g.globalAlpha = r % 2 ? 0.9 : 0.55;
-        g.fillRect(S * 0.5 - w / 2 + d, r * h + h * 0.26, w, h * 0.48);
+      for (let r = 0; r < rows; r++) {
+        const d = (push * 0.30 + Math.sin(t * 0.0009 + r * 0.7) * 0.10) * W;
+        const w = W * (0.24 + 0.26 * Math.abs(Math.sin(r * 1.3)));
+        g.globalAlpha = r % 2 ? 0.92 : 0.5;
+        g.fillRect(W * 0.5 - w / 2 + d, r * h + h * 0.24, w, h * 0.52);
       }
       g.globalAlpha = 1;
     },
 
     // 한 도의 밀도 — 같은 잉크가 성기게, 짙게
-    density(g, S, t, ink) {
-      const rows = 9;
+    density(g, W, H, t, ink, p) {
+      const rows = 9, h = H / rows;
       g.fillStyle = ink;
       for (let r = 0; r < rows; r++) {
         const u = (r + 0.5) / rows;
-        const a = clamp(0.10 + 0.85 * Math.abs(Math.sin(t * 0.0006 + u * Math.PI)), 0, 1);
+        const a = clamp(1.06 - Math.abs(u - p.y) * 2.2
+          + 0.13 * Math.sin(t * 0.0007 + u * 6), 0.05, 1);
         g.globalAlpha = a;
-        g.fillRect(0, r * (S / rows), S, S / rows);
+        g.fillRect(0, r * h, W, h * 0.99);
       }
       g.globalAlpha = 1;
     },
 
     // 판의 차례 — 먼저 앉은 도 위에 다음 도가 얹힌다
-    overprint(g, S, t, ink) {
-      const d = S * 0.13;
-      const a = t * 0.0007;
-      // 흰 무늬라 곱하기로는 아무것도 안 나온다. 겹친 자리가 밝아지게 쌓는다
+    overprint(g, W, H, t, ink, p) {
+      const S = Math.min(W, H);
+      const w = S * 0.5;
+      const d = S * 0.15;
+      const a = t * 0.0006 + (p.x - 0.5) * 3.6;
+      const n = Math.max(1, Math.round(W / (S * 0.92)));
       g.fillStyle = ink;
       g.globalAlpha = 0.5;
-      for (let k = 0; k < 2; k++) {
-        const s2 = k ? 1 : -1;
-        g.beginPath();
-        g.rect(S * 0.5 - S * 0.30 + s2 * Math.cos(a) * d,
-               S * 0.5 - S * 0.30 + s2 * Math.sin(a) * d,
-               S * 0.60, S * 0.60);
-        g.fill();
+      for (let i = 0; i < n; i++) {
+        const cx = W * (i + 0.5) / n;
+        for (let k = 0; k < 2; k++) {
+          const s = k ? 1 : -1;
+          g.fillRect(cx - w / 2 + s * Math.cos(a + i) * d,
+                     H / 2 - w / 2 + s * Math.sin(a + i) * d, w, w);
+        }
       }
       g.globalAlpha = 1;
     },
 
     // 글자의 몸 — 낱말이 도형이 되는 자리
-    type(g, S, t, ink) {
-      const n = 4, w = S / n;
+    type(g, W, H, t, ink, p) {
+      const cell = Math.min(W, H) / 3.1;
+      const cols = Math.max(1, Math.round(W / cell));
+      const rows = Math.max(1, Math.round(H / cell));
+      const cw = W / cols, ch = H / rows;
+      const px = p.x * W, py = p.y * H;
+      const reach = Math.hypot(W, H) * 0.42;
       g.fillStyle = ink;
       g.textAlign = 'center';
       g.textBaseline = 'middle';
-      g.font = '700 ' + (w * 0.94).toFixed(1) + 'px ' + FACE;
-      for (let r = 0; r < n; r++) {
-        for (let c = 0; c < n; c++) {
-          g.globalAlpha = 0.28 + 0.62 * Math.abs(Math.sin(t * 0.0009 + (r + c) * 0.8));
-          g.fillText(ch(r * 13 + c * 7 + Math.floor(t * 0.0006)), c * w + w / 2, r * w + w / 2);
+      g.font = '700 ' + (Math.min(cw, ch) * 0.94).toFixed(1) + 'px ' + FACE_FONT;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x = (c + 0.5) * cw, y = (r + 0.5) * ch;
+          const near = clamp(1 - Math.hypot(x - px, y - py) / reach, 0, 1);
+          const spin = t * 0.0007 * (1 + near * 8) + r * 13 + c * 7;
+          g.globalAlpha = 0.26 + 0.64 * Math.abs(Math.sin(t * 0.0009 + (r + c) * 0.8));
+          g.fillText(GLYPHS[Math.floor(Math.abs(spin)) % GLYPHS.length], x, y);
         }
       }
       g.globalAlpha = 1;
     },
   };
 
-  /* 활자는 Quantico 한 벌로 간다. 표제와 사실 정보를 굵기와
-     자간으로만 가른다. 한글은 Pretendard 가 받는다. */
-  const FACE = "'Quantico', 'Pretendard Variable', Pretendard, 'Noto Sans KR', sans-serif";
-
-  /* 한 화면에 잉크는 두 도까지다. 그래서 구슬마다 제 색을 쓰지 않고,
-     지금 펼쳐진 배색의 보조 도 하나로 다섯 장면을 모두 찍는다.
-     구슬을 가르는 것은 색이 아니라 무늬다. */
-  function paintArt(it, t, col, edge) {
-    const S = ART_SIZE;
-    const ink = rgbs(col.paper);        // 무늬는 종이 흰색으로 뚫린다
-    ax.globalCompositeOperation = 'source-over';
-    ax.clearRect(0, 0, S, S);
-
-    // 구 안쪽 면 — 바탕과 같은 색을 한 단계 올린 것
-    ax.fillStyle = rgbs(col.orb);
-    ax.fillRect(0, 0, S, S);
-
-    ax.save();
-    (SCENES[it.art] || SCENES.halftone)(ax, S, t, ink);
-    ax.restore();
-
-    // 원 밖은 잘라 내고, 가장자리는 서서히 투명해지게 한다.
-    // 이 흐린 띠가 이웃 구슬의 미리보기와 겹쳐 경계를 지운다.
-    ax.globalCompositeOperation = 'destination-in';
-    const m = ax.createRadialGradient(S / 2, S / 2, S * 0.5 * edge, S / 2, S / 2, S * 0.5);
-    m.addColorStop(0, 'rgba(0,0,0,1)');
-    m.addColorStop(1, 'rgba(0,0,0,0)');
-    ax.fillStyle = m;
-    ax.fillRect(0, 0, S, S);
-    ax.globalCompositeOperation = 'source-over';
-  }
-
   /* ==================================================================
-   * 열리는 인터랙션 — 어긋난 판 (overprint duotone)
-   *
-   * 두 도를 따로 찍으면 판은 반드시 조금 어긋난다. 여기서는 그
-   * 어긋남을 손으로 벌린다. 끌면 두 판이 갈라지고, 겹치는 자리는
-   * 곱해져 짙어진다. 놓으면 스프링으로 제자리에 물린다.
+   * 자리
    * ================================================================ */
 
-  const plateA = document.createElement('canvas');
-  const plateB = document.createElement('canvas');
-  const pax = plateA.getContext('2d');
-  const pbx = plateB.getContext('2d');
-  let plateKey = '';
+  const root = document.documentElement;
+  const roomEl = document.getElementById('room');
+  const stageEl = document.getElementById('stage');
+  const railEl = document.getElementById('rail');
+  const deckEl = document.getElementById('deck');
+  const seatEl = document.getElementById('seat');
+  const consoleEl = document.getElementById('console');
+  const ledEl = document.getElementById('led');
+  const lcdEl = document.getElementById('lcd');
+  const lcdCv = document.getElementById('lcd-cv');
+  const flightEl = document.getElementById('flight');
+  const playEl = document.getElementById('play');
+  const playCv = document.getElementById('play-cv');
+  const footEl = document.querySelector('.hud-foot');
+  const nowNoEl = document.getElementById('now-no');
+  const nowTitleEl = document.getElementById('now-title');
+  const nowSubEl = document.getElementById('now-sub');
+  const playTitleEl = document.getElementById('play-title');
+  const playHintEl = document.getElementById('play-hint');
+  const ejectEl = document.getElementById('eject');
+  document.getElementById('hud-count').textContent =
+    String(CARTS.length).padStart(2, '0') + ' TITLES';
 
-  const reg = { x: 0, y: 0, vx: 0, vy: 0, tx: 0, ty: 0, held: false };
+  const LCD_W = 240, LCD_H = 160;      // 어드밴스의 도트 판
+  lcdCv.width = LCD_W;
+  lcdCv.height = LCD_H;
+  const lcdG = lcdCv.getContext('2d');
 
-  function bakePlates(it) {
-    const W = graphW, H = graphH;
-    for (const c of [plateA, plateB]) { c.width = W; c.height = H; }
-    for (const g of [pax, pbx]) {
-      g.setTransform(1, 0, 0, 1, 0, 0);
-      g.clearRect(0, 0, W, H);
-      g.textBaseline = 'alphabetic';
-    }
+  const lcdBuf = document.createElement('canvas');
+  lcdBuf.width = LCD_W;
+  lcdBuf.height = LCD_H;
+  const bufG = lcdBuf.getContext('2d');
 
-    const M = Math.round(W * 0.045);          // 왼쪽 여백 — 표지와 같은 자리
-    const disc = { x: W * 0.72, y: H * 0.48, r: Math.min(W, H) * 0.29 };
+  const playG = playCv.getContext('2d');
 
-    /* --- 판 1 : 진한 도 — 망점 원판과 큰 글자 --- */
-    pax.fillStyle = it.ground;
-    const step = Math.max(6, disc.r / 15);
-    for (let y = disc.y - disc.r; y <= disc.y + disc.r; y += step) {
-      for (let x = disc.x - disc.r; x <= disc.x + disc.r; x += step) {
-        const d = Math.hypot(x - disc.x, y - disc.y) / disc.r;
-        if (d > 1) continue;
-        pax.beginPath();
-        pax.arc(x, y, step * 0.52 * Math.sqrt(1 - d * d * 0.72), 0, TAU);
-        pax.fill();
+  const samp = document.createElement('canvas');
+  const sampG = samp.getContext('2d', { willReadFrequently: true });
+
+  /* ==================================================================
+   * 칩 한 장 만들기 — 선반의 칩, 날아가는 칩, 꽂힌 카트리지가 모두 같다
+   * ================================================================ */
+
+  const SIGN = 'M3 27 C 9 9, 15 5, 17 15 C 19 25, 13 30, 12 23 C 11 15, 21 9, 30 19 '
+             + 'C 36 25, 41 23, 45 13 C 48 5, 53 7, 51 17 C 49 27, 43 30, 45 21 '
+             + 'C 47 12, 59 9, 67 18 C 73 24, 80 22, 97 11';
+
+  function faceEl(cart, width) {
+    const el = document.createElement('div');
+    el.className = 'face';
+    el.style.setProperty('--w', width + 'px');
+    el.style.setProperty('--h', (width / 0.76) + 'px');
+    el.style.setProperty('--body', cart.body);
+    el.style.setProperty('--fg', cart.fg);
+    el.innerHTML =
+      '<span class="face-grip">' + '<i></i>'.repeat(14) + '</span>' +
+      '<canvas class="face-art"></canvas>' +
+      '<h3 class="face-title"><span>Interaction</span>' + cart.title + '</h3>' +
+      '<div class="face-meta">' +
+        '<span><b>MODE</b><em>' + cart.mode + '</em></span>' +
+        '<span><b>CART</b><em>NO. ' + cart.no + '</em></span>' +
+      '</div>' +
+      '<svg class="face-sign" viewBox="0 0 100 34" preserveAspectRatio="xMinYMid meet" aria-hidden="true">' +
+        '<path d="' + SIGN + '"/></svg>' +
+      '<span class="face-rule"></span>' +
+      '<span class="face-shade"></span>';
+    return el;
+  }
+
+  /* 칩 위의 무늬 — 장면을 낮은 해상도로 떠서 네모 칸으로 찍는다 */
+  function paintChipArt(cv, cart) {
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return;
+
+    const cols = 30, rows = 13, SS = 4;
+    samp.width = cols * SS;
+    samp.height = rows * SS;
+    sampG.clearRect(0, 0, samp.width, samp.height);
+    sampG.save();
+    SCENES[cart.scene](sampG, samp.width, samp.height, cart.seed || 0, '#ffffff', IDLE);
+    sampG.restore();
+    const px = sampG.getImageData(0, 0, samp.width, samp.height).data;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    const g = cv.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+
+    const cw = w / cols, ch = h / rows;
+    const sq = Math.min(cw, ch) * 0.76;
+    g.fillStyle = cart.fg;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        let acc = 0;
+        for (let j = 0; j < SS; j++) {
+          for (let i = 0; i < SS; i++) {
+            acc += px[(((r * SS + j) * samp.width) + (c * SS + i)) * 4 + 3];
+          }
+        }
+        const v = acc / (SS * SS * 255);
+        if (v < 0.06) continue;
+        g.globalAlpha = 0.2 + 0.8 * Math.min(1, v * 1.3);
+        g.fillRect(c * cw + (cw - sq) / 2, r * ch + (ch - sq) / 2, sq, sq);
       }
     }
-    pax.textAlign = 'left';
-    pax.font = '700 ' + Math.round(H * 0.135) + 'px ' + FACE;
-    pax.fillText(it.title, M, H * 0.42);
+    g.globalAlpha = 1;
+  }
 
-    /* --- 판 2 : 보조 도 — 동심원과 사실 정보 --- */
-    pbx.strokeStyle = it.accent;
-    pbx.lineWidth = Math.max(1.5, disc.r * 0.018);
-    for (let i = 1; i <= 7; i++) {
-      pbx.beginPath();
-      pbx.arc(disc.x, disc.y, disc.r * (i / 7), 0, TAU);
-      pbx.stroke();
-    }
-    pbx.fillStyle = it.accent;
-    pbx.textAlign = 'left';
-    pbx.font = '700 ' + Math.round(H * 0.135) + 'px ' + FACE;
-    pbx.globalAlpha = 0.55;
-    pbx.fillText(it.title, M, H * 0.42);
-    pbx.globalAlpha = 1;
+  /* ==================================================================
+   * 선반 — 부채처럼 겹친 칩
+   * ================================================================ */
 
-    // Quantico 는 고정폭이 아니다. 공백으로 칸을 맞추면 어긋나므로
-    // 라벨과 값을 각자 x 에 앉힌다.
-    const facts = [
-      ['PALETTE',   it.palette],
-      ['MODE',      it.mode.toUpperCase()],
-      ['SUBSTRATE', it.paper.toUpperCase()],
-      ['PLATE 1',   it.ground.toUpperCase() + '  DOMINANT'],
-      ['PLATE 2',   it.accent.toUpperCase() + '  ACCENT'],
-    ];
-    const fs = Math.max(10, Math.round(H * 0.0165));
-    const col2 = M + fs * 7.6;
-    pbx.font = '700 ' + fs + 'px ' + FACE;
-    facts.forEach(([label, value], i) => {
-      const y = H * 0.53 + i * fs * 1.9;
-      pbx.globalAlpha = 0.62;
-      pbx.fillText(label, M, y);
-      pbx.globalAlpha = 1;
-      pbx.fillText(value, col2, y);
+  const FAN = {
+    gapNear: 1.50,   // 초점에서의 벌어지는 힘 (칩 너비 대비)
+    gapFar: 0.26,    // 멀어지면 이 간격으로 고르게 쌓인다
+    k: 0.92,         // 그 간격에 이르는 빠르기
+    // 밑바닥 선은 화면과 나란하다. 칩은 저마다 제 아래 모서리를 축으로
+    // 돌아서, 서랍에 세워 둔 서류처럼 가운데 한 장만 곧게 서고 양옆은
+    // 바깥으로 눕는다. 밑변이 한 줄에 서므로 바닥이 기울어 보이지 않는다.
+    tilt: 4.5,       // 끝까지 누웠을 때의 각도
+    turn: 0.6,       // 눕는 빠르기
+    //
+    // 크기는 모두 같다. 레퍼런스의 클로즈업에서 뒤쪽 칩의 도트 칸도,
+    // 활자도, 드러난 폭도 앞쪽과 똑같다 — 줄어드는 것은 없고, 다만
+    // 고른 간격으로 겹쳐 쌓일 뿐이다. 초점만 한 뼘 앞으로 나온다.
+    base: 0.96,      // 초점이 아닌 칩의 크기 — 서로 같다
+    peak: 3.0,       // 초점만 커지는 좁기
+    dim: 0.5,        // 뒤로 갈수록 어둑해지는 빠르기
+    shade: 0.10,
+  };
+
+  /* 바로 옆 칩까지의 실제 거리 — 끌 때의 한 칸이기도 하다 */
+  const stepPx = () => Math.abs(fanX(1)) || cardW;
+
+  /* 초점만 한 뼘 앞으로 나온다. 나머지는 서로 같은 크기다. */
+  function scaleOf(d) {
+    return FAN.base + (1 - FAN.base) * Math.exp(-FAN.peak * Math.abs(d));
+  }
+
+  const chips = [];
+  const rail = { pos: 0, target: 0, vel: 0, drag: null, wheel: 0, wheelAt: 0 };
+  let focus = 0;
+  let cardW = 0, cardH = 0;
+  let state = 'shelf';     // shelf | inserting | play | ejecting
+
+  CARTS.forEach((cart, i) => {
+    cart.seed = 900 + i * 1700;
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.dataset.i = String(i);
+    chip.setAttribute('role', 'option');
+    chip.appendChild(faceEl(cart, 200));
+    railEl.appendChild(chip);
+    chip._shade = chip.querySelector('.face-shade');
+    chip._art = chip.querySelector('.face-art');
+    chips.push(chip);
+  });
+
+  const probe = document.createElement('div');
+  probe.className = 'probe';
+  railEl.appendChild(probe);
+
+  function readSizes() {
+    cardW = probe.getBoundingClientRect().width || 160;
+    cardH = cardW / 0.76;
+    chips.forEach((chip) => {
+      chip.style.setProperty('--w', cardW + 'px');
+      chip.style.setProperty('--h', cardH + 'px');
+      chip.firstChild.style.setProperty('--w', cardW + 'px');
+      chip.firstChild.style.setProperty('--h', cardH + 'px');
     });
-
-    plateKey = it.title + '|' + W + 'x' + H;
   }
 
-  function drawPiece(now, it) {
-    // 종이
-    cx.fillStyle = it.paper;
-    cx.fillRect(0, 0, graphW, graphH);
-
-    if (plateKey !== it.title + '|' + graphW + 'x' + graphH) bakePlates(it);
-
-    // 두 판을 곱해서 얹는다 — 겹치는 자리가 짙어진다
-    cx.save();
-    cx.globalCompositeOperation = 'multiply';
-    cx.drawImage(plateA, -reg.x * 0.5, -reg.y * 0.5);
-    cx.drawImage(plateB, reg.x * 0.5, reg.y * 0.5);
-    cx.restore();
-
-    // 안내 한 줄
-    const off = Math.hypot(reg.x, reg.y) / (unit * REG_RANGE);
-    cx.save();
-    cx.textAlign = 'left';
-    cx.textBaseline = 'alphabetic';
-    cx.font = '700 ' + Math.max(10, Math.round(graphH * 0.0165)) + 'px ' + FACE;
-    cx.fillStyle = it.ground;
-    cx.globalAlpha = 0.55 + 0.45 * (1 - Math.min(1, off));
-    cx.fillText(
-      it.piece !== 'register' ? 'IN REGISTER'
-      : off > 0.04 ? 'OUT OF REGISTER  ' + (off * 100).toFixed(0) + '%'
-      : 'DRAG TO PULL THE PLATES APART',
-      Math.round(graphW * 0.045), graphH * 0.95);
-    cx.restore();
+  function repaintArt() {
+    chips.forEach((chip, i) => paintChipArt(chip._art, CARTS[i]));
   }
 
-  function stepRegister(dt) {
-    if (!reg.held) { reg.tx = 0; reg.ty = 0; }
-    const k = Math.min(1, dt / 16);
-    reg.vx = (reg.vx + (reg.tx - reg.x) * REG_SPRING * k) * REG_DAMP;
-    reg.vy = (reg.vy + (reg.ty - reg.y) * REG_SPRING * k) * REG_DAMP;
-    reg.x += reg.vx;
-    reg.y += reg.vy;
+  /* 초점에서 d 칸 떨어진 칩의 가로 자리.
+     바로 옆은 넉넉히 벌어지고, 멀어질수록 겹쳐 쌓인다.  */
+  function fanX(d) {
+    const a = Math.abs(d), s = Math.sign(d);
+    const { gapNear: mx, gapFar: mn, k } = FAN;
+    return s * (mn * a + (mx - mn) * (1 - Math.exp(-k * a)) / k) * cardW;
   }
 
-  /* --- 액체처럼 퍼지는 원 — 눌린 구슬에서 종이가 번진다 --- */
-  function drawBlob(t, it) {
-    const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    const far = Math.hypot(
-      Math.max(open.x, graphW - open.x),
-      Math.max(open.y, graphH - open.y)) * 1.06;
-    const base = open.r0 + (far - open.r0) * e;
-    const amp = 0.16 * Math.sin(Math.PI * t);
-    const ph = performance.now() * 0.0016;
-
-    const w = Math.min(1, t * 1.7);
-    const gr = cx.createRadialGradient(open.x, open.y, 0, open.x, open.y, base * 1.2);
-    gr.addColorStop(0, rgbs(mixRGB(it.pRGB, vividOf(it.gRGB), 1 - w)));
-    gr.addColorStop(1, rgbs(mixRGB(it.pRGB, it.gRGB, (1 - w) * 0.85)));
-    cx.fillStyle = gr;
-
-    cx.beginPath();
-    for (let i = 0; i <= 96; i++) {
-      const a = (i / 96) * TAU;
-      const k = 1 + amp * (Math.sin(a * 3 + ph) * 0.62 + Math.sin(a * 5 - ph * 1.4) * 0.38);
-      const r = base * k;
-      const px = open.x + Math.cos(a) * r;
-      const py = open.y + Math.sin(a) * r;
-      if (i === 0) cx.moveTo(px, py); else cx.lineTo(px, py);
+  function layoutRail() {
+    // 덩어리째 가운데 둔다 — 고른 칩이 아니라 펼쳐진 묶음이 화면 복판에 선다.
+    // 그래서 첫 장을 보고 있어도 한쪽이 비지 않는다.
+    const mid = (fanX(-rail.pos) + fanX(chips.length - 1 - rail.pos)) / 2;
+    for (let i = 0; i < chips.length; i++) {
+      const d = i - rail.pos;
+      const a = Math.abs(d);
+      const x = fanX(d) - mid;
+      const sc = scaleOf(d);
+      const rz = Math.sign(d) * FAN.tilt * (1 - Math.exp(-FAN.turn * a));
+      const chip = chips[i];
+      chip.style.transform =
+        'translate3d(' + x.toFixed(2) + 'px,0,0) ' +
+        'rotate(' + rz.toFixed(2) + 'deg) scale(' + sc.toFixed(4) + ')';
+      chip.style.zIndex = String(100 - Math.round(a * 10));
+      chip.classList.toggle('is-focus', a < 0.5);
+      chip._shade.style.opacity =
+        (FAN.shade * (1 - Math.exp(-FAN.dim * a))).toFixed(3);
     }
-    cx.closePath();
-    cx.fill();
   }
 
-  /* ==================================================================
-   * 왼쪽 글자 — 레퍼런스 자리 그대로
-   * ================================================================ */
+  function stepRail(dt) {
+    if (rail.drag) return;
+    const k = Math.min(2.4, dt / 16.7);
+    rail.vel = (rail.vel + (rail.target - rail.pos) * 0.155 * k) * Math.pow(0.80, k);
+    rail.pos += rail.vel * k;
+    if (Math.abs(rail.vel) < 0.0007 && Math.abs(rail.target - rail.pos) < 0.0009) {
+      rail.pos = rail.target;
+      rail.vel = 0;
+    }
+  }
 
-  const HEAD = ['HELLO, HAVE A GOOD DAY', 'MONO-COLOR EDITORIAL', 'INTERACTION ARCHIVE'];
-  const STRIP_LEN = 44;
-
-  function syncPanel(force) {
-    const idx = wrap(Math.round(scroll));
-    if (idx === shownIndex && !force) return;
-    shownIndex = idx;
-
-    const n = INTERACTIONS.length;
-    const num = String(idx + 1).padStart(2, '0') + '/' + String(n).padStart(2, '0');
-
-    headAEl.textContent = HEAD[0];
-    headBEl.textContent = HEAD[1];
-    headCEl.textContent = HEAD[2] + ' ' + num;
-
-    const on = Math.max(1, Math.round(((idx + 1) / n) * STRIP_LEN));
-    stripNumEl.textContent = num + ' ' + INTERACTIONS[idx].palette.toUpperCase() + ' ';
-    stripOnEl.textContent = '1'.repeat(on);
-    stripOffEl.textContent = '1'.repeat(STRIP_LEN - on);
-
+  /* 지금 보고 있는 카트리지를 못박는다. 스프링이 목표를 살짝 지나칠 수
+     있어서, 넣는 순간의 기준은 pos 가 아니라 target 이다. */
+  function setNow(i, swap) {
+    focus = i;
+    const cart = CARTS[i];
     const write = () => {
-      const it = INTERACTIONS[idx];
-      panelTitleEl.textContent = it.title;
-      panelDescEl.textContent = it.desc;
-      panelEl.classList.remove('is-swap');
+      nowNoEl.textContent = cart.no;
+      nowTitleEl.textContent = cart.title;
+      nowSubEl.textContent = cart.mode + ' · ' + cart.palette;
+      footEl.classList.remove('is-swap');
     };
+    if (swap) {
+      footEl.classList.add('is-swap');
+      setTimeout(write, 180);
+    } else {
+      write();
+    }
+    chips.forEach((c, n) => c.setAttribute('aria-selected', n === i ? 'true' : 'false'));
+  }
 
-    clearTimeout(panelTimer);
-    if (force) { write(); return; }
-    panelEl.classList.add('is-swap');
-    panelTimer = setTimeout(write, 200);
+  function syncNow() {
+    if (!Number.isFinite(rail.pos)) { rail.pos = rail.target; rail.vel = 0; }
+    const i = clamp(Math.round(rail.pos), 0, CARTS.length - 1);
+    if (i !== focus) setNow(i, true);
   }
 
   /* ==================================================================
-   * 매 프레임
+   * 화면 — 도트 매트릭스 한 판
    * ================================================================ */
 
+  const lcd = { power: 0, boot: -1, contrast: 0.17 };
+
+  function paintLcd(now) {
+    const cart = CARTS[focus];
+    const on = lcd.power > 0.5;
+    const ground = on ? cart.paper : '#151711';
+    const ink = on ? cart.ink : '#8CA173';
+
+    bufG.clearRect(0, 0, LCD_W, LCD_H);
+    bufG.save();
+    SCENES[cart.scene](bufG, LCD_W, LCD_H, now, ink, IDLE);
+    bufG.restore();
+
+    lcdG.globalAlpha = 1;
+    lcdG.fillStyle = ground;
+    lcdG.fillRect(0, 0, LCD_W, LCD_H);
+    lcdG.globalAlpha = lcd.contrast;
+    lcdG.drawImage(lcdBuf, 0, 0);
+    lcdG.globalAlpha = 1;
+
+    if (!on) {
+      lcdG.fillStyle = 'rgba(18,20,14,0.82)';
+      lcdG.fillRect(0, LCD_H * 0.2 - LCD_H * 0.07, LCD_W, LCD_H * 0.14);
+      lcdG.fillStyle = 'rgba(150,171,124,0.72)';
+      lcdG.font = '700 ' + (LCD_H * 0.07).toFixed(1) + 'px ' + FACE_FONT;
+      lcdG.textAlign = 'center';
+      lcdG.textBaseline = 'middle';
+      lcdG.fillText('INSERT CARTRIDGE', LCD_W / 2, LCD_H * 0.2);
+      return;
+    }
+
+    // 기동 — 마크가 위에서 내려와 한 박자 머문다
+    if (lcd.boot >= 0) {
+      const b = clamp((now - lcd.boot) / MS.boot, 0, 1);
+      const slide = b < 0.62 ? b / 0.62 : 1;
+      const e = 1 - Math.pow(1 - slide, 3);
+      const y = lerp(-LCD_H * 0.14, LCD_H * 0.2, e);
+      lcdG.fillStyle = ground;
+      lcdG.fillRect(0, 0, LCD_W, LCD_H);
+      lcdG.fillStyle = cart.ink;
+      lcdG.textAlign = 'center';
+      lcdG.textBaseline = 'middle';
+      lcdG.font = '700 ' + (LCD_H * 0.125).toFixed(1) + 'px ' + FACE_FONT;
+      lcdG.fillText('CRAFT BOY', LCD_W / 2, y);
+      lcdG.font = '700 ' + (LCD_H * 0.055).toFixed(1) + 'px ' + FACE_FONT;
+      lcdG.globalAlpha = b > 0.72 ? 1 : 0;
+      lcdG.fillText('ADVANCE  ·  NO. ' + cart.no, LCD_W / 2, y + LCD_H * 0.13);
+      lcdG.globalAlpha = 1;
+      if (b >= 1) lcd.boot = -1;
+    }
+  }
+
+  /* ==================================================================
+   * 화면 안 — 확대가 끝난 뒤의 실물
+   * ================================================================ */
+
+  const ptr = { x: 0.5, y: 0.5, dx: 0, dy: 0, down: false, tx: 0, ty: 0, vx: 0, vy: 0 };
+
+  // 캔버스의 실제 상자에서 크기를 딴다. 창이 바뀌는 도중에 잰 값으로
+  // 뒷판을 잡아 두면 가장자리에 그리지 않은 띠가 남는다.
+  let playW = 0, playH = 0;
+
+  function sizePlay() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    playW = playCv.clientWidth || window.innerWidth;
+    playH = playCv.clientHeight || window.innerHeight;
+    playCv.width = Math.round(playW * dpr);
+    playCv.height = Math.round(playH * dpr);
+    playG.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function stepPtr(dt) {
+    const k = Math.min(2, dt / 16.7);
+    if (!ptr.down) { ptr.tx = 0; ptr.ty = 0; }
+    ptr.vx = (ptr.vx + (ptr.tx - ptr.dx) * 0.17 * k) * Math.pow(0.78, k);
+    ptr.vy = (ptr.vy + (ptr.ty - ptr.dy) * 0.17 * k) * Math.pow(0.78, k);
+    ptr.dx += ptr.vx * k;
+    ptr.dy += ptr.vy * k;
+  }
+
+  function paintPlay(now) {
+    if (playCv.clientWidth !== playW || playCv.clientHeight !== playH) sizePlay();
+    const cart = CARTS[focus];
+    const W = playW, H = playH;
+    playG.fillStyle = cart.paper;
+    playG.fillRect(0, 0, W, H);
+    playG.save();
+    SCENES[cart.scene](playG, W, H, now, cart.ink, ptr);
+    playG.restore();
+  }
+
+  /* ==================================================================
+   * 넣기 — 칩이 날아가 홈에 앉고, 불이 들어오고, 화면 안으로 들어간다
+   * ================================================================ */
+
+  const seq = { skip: false, timers: [], anims: [] };
+
+  /* 자리는 언제나 중심으로 잰다 — 돌아간 칩의 rect 는 카드보다 크게 잡힌다.
+     가운데 칩은 곧게 서 있으니 날아갈 때 펼 기울기는 없다. */
+  const RAIL_TILT = 0;
+
+  const midOf = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+
+  function poseAt(cx, cy, s, rot) {
+    return 'translate(' + (cx - cardW / 2).toFixed(1) + 'px,'
+      + (cy - cardH / 2).toFixed(1) + 'px) '
+      + 'rotate(' + rot.toFixed(2) + 'deg) scale(' + s.toFixed(4) + ')';
+  }
+
+  function wait(ms) {
+    if (seq.skip || REDUCED) return Promise.resolve();
+    return new Promise((res) => {
+      const id = setTimeout(() => {
+        const n = seq.timers.findIndex((t) => t.id === id);
+        if (n >= 0) seq.timers.splice(n, 1);
+        res();
+      }, ms);
+      seq.timers.push({ id, res });
+    });
+  }
+
+  function run(el, frames, opts) {
+    const a = el.animate(frames, Object.assign({ fill: 'forwards' }, opts));
+    seq.anims.push(a);
+    a.finished.catch(() => {}).then(() => {
+      const n = seq.anims.indexOf(a);
+      if (n >= 0) seq.anims.splice(n, 1);
+    });
+    if (seq.skip) a.finish();
+    return a;
+  }
+
+  function skipSequence() {
+    if (state !== 'inserting') return;
+    seq.skip = true;
+    seq.anims.slice().forEach((a) => { try { a.finish(); } catch (e) {} });
+    seq.timers.splice(0).forEach((t) => { clearTimeout(t.id); t.res(); });
+  }
+
+  /* 화면(LCD)이 눈앞을 꽉 채우도록 stage 를 밀고 키우는 값 */
+  function zoomTransform() {
+    const prev = stageEl.style.transform;
+    stageEl.style.transform = 'none';
+    const r = lcdEl.getBoundingClientRect();
+    stageEl.style.transform = prev;
+    const k = Math.max(innerWidth / r.width, innerHeight / r.height) * 1.02;
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    return 'translate(' + (-k * (cx - innerWidth / 2)).toFixed(2) + 'px,'
+      + (-k * (cy - innerHeight / 2)).toFixed(2) + 'px) scale(' + k.toFixed(4) + ')';
+  }
+
+  async function insert() {
+    if (state !== 'shelf') return;
+    state = 'inserting';
+    seq.skip = false;
+
+    const i = clamp(Math.round(rail.target), 0, CARTS.length - 1);
+    if (i !== focus) setNow(i, false);
+    const cart = CARTS[i];
+    const chip = chips[i];
+
+    const from = midOf(chip.getBoundingClientRect());
+    const to = seatEl.getBoundingClientRect();
+    const seat = midOf(to);
+    const raise = to.height * 0.5;
+    const sc = to.width / cardW;
+
+    // 날아가는 동안 선반은 물러난다
+    chip.classList.add('is-hidden');
+    railEl.classList.add('is-gone');
+    root.classList.add('is-leaving');
+
+    const flier = faceEl(cart, cardW);
+    flier.style.transform = poseAt(from.x, from.y, 1, RAIL_TILT);
+    flightEl.appendChild(flier);
+    paintChipArt(flier.querySelector('.face-art'), cart);
+
+    const a1 = run(flier, [
+      { transform: poseAt(from.x, from.y, 1, RAIL_TILT), easing: EASE.out },
+      { transform: poseAt(lerp(from.x, seat.x, 0.26), from.y - cardH * 0.14, 1.04, RAIL_TILT * 0.55),
+        offset: 0.32, easing: EASE.inOut },
+      { transform: poseAt(seat.x, seat.y - raise - to.height * 0.12, sc * 1.012, 0),
+        offset: 0.74, easing: EASE.out },
+      { transform: poseAt(seat.x, seat.y - raise, sc, 0) },
+    ], { duration: REDUCED ? 1 : MS.flight });
+    await a1.finished.catch(() => {});
+
+    // 날아온 칩을 홈에 놓인 카트리지로 바꿔 단다 — 자리가 같아 티가 없다
+    seatEl.innerHTML = '';
+    const seatFace = faceEl(cart, to.width);
+    seatEl.appendChild(seatFace);
+    paintChipArt(seatFace.querySelector('.face-art'), cart);
+    seatEl.style.transform = 'translateY(' + (-raise) + 'px)';
+    seatEl.classList.add('is-in');
+    requestAnimationFrame(() => flier.remove());
+
+    const a2 = run(seatEl, [
+      { transform: 'translateY(' + (-raise) + 'px)' },
+      { transform: 'translateY(3px)', offset: 0.84, easing: EASE.drawer },
+      { transform: 'translateY(0)' },
+    ], { duration: REDUCED ? 1 : MS.seat });
+
+    // 앉는 순간 기계가 한 번 눌린다
+    setTimeout(() => {
+      if (REDUCED) return;
+      consoleEl.animate([
+        { transform: 'translateY(0)' },
+        { transform: 'translateY(2.5px)' },
+        { transform: 'translateY(0)' },
+      ], { duration: 170, easing: 'ease-out' });
+    }, MS.seat * 0.72);
+
+    await a2.finished.catch(() => {});
+    seatEl.style.transform = 'translateY(0)';
+    a2.cancel();
+
+    // 불이 든다
+    ledEl.classList.add('is-on');
+    lcd.power = 1;
+    lcd.contrast = 1;
+    lcd.boot = performance.now();
+    await wait(MS.power + MS.boot);
+    lcd.boot = -1;
+
+    // 화면 안으로
+    if (!REDUCED) {
+      stageEl.style.transition = 'transform ' + MS.zoom + 'ms ' + EASE.inOut;
+      stageEl.style.transform = zoomTransform();
+      await wait(MS.zoom);
+    }
+
+    playTitleEl.textContent = cart.title;
+    playHintEl.textContent = cart.hint;
+    playEl.style.setProperty('--play-ink', cart.ink);
+    playEl.setAttribute('aria-hidden', 'false');
+    playEl.classList.add('is-on');
+    roomEl.classList.add('is-inside');
+    ptr.dx = 0; ptr.dy = 0; ptr.vx = 0; ptr.vy = 0;
+    state = 'play';
+  }
+
+  async function eject() {
+    if (state !== 'play') return;
+    state = 'ejecting';
+    seq.skip = false;
+
+    playEl.classList.remove('is-on');
+    playEl.setAttribute('aria-hidden', 'true');
+    roomEl.classList.remove('is-inside');
+    await wait(MS.fade);
+
+    if (!REDUCED) {
+      stageEl.style.transition = 'transform ' + MS.out + 'ms ' + EASE.inOut;
+      stageEl.style.transform = 'none';
+      await wait(MS.out);
+    } else {
+      stageEl.style.transform = 'none';
+    }
+
+    // 카트리지가 튀어 오르고, 칩은 제자리로 돌아간다
+    const cart = CARTS[focus];
+    const chip = chips[focus];
+    const to = seatEl.getBoundingClientRect();
+    const raise = to.height * 0.5;
+
+    const up = run(seatEl, [
+      { transform: 'translateY(0)' },
+      { transform: 'translateY(' + (-raise) + 'px)' },
+    ], { duration: REDUCED ? 1 : 260, easing: EASE.out });
+    await up.finished.catch(() => {});
+
+    railEl.classList.remove('is-gone');
+    root.classList.remove('is-leaving');
+
+    const from = midOf(chip.getBoundingClientRect());
+    const sc = to.width / cardW;
+    const flier = faceEl(cart, cardW);
+    flier.style.transform = poseAt(seat.x, seat.y - raise, sc, 0);
+    flightEl.appendChild(flier);
+    paintChipArt(flier.querySelector('.face-art'), cart);
+    seatEl.classList.remove('is-in');
+    up.cancel();
+    seatEl.style.transform = 'translateY(0)';
+    seatEl.innerHTML = '';
+
+    await (run(flier, [
+      { transform: poseAt(seat.x, seat.y - raise, sc, 0), easing: EASE.out },
+      { transform: poseAt(from.x, from.y, 1, RAIL_TILT) },
+    ], { duration: REDUCED ? 1 : 380 }).finished.catch(() => {}));
+
+    chip.classList.remove('is-hidden');
+    flier.remove();
+
+    ledEl.classList.remove('is-on');
+    lcd.power = 0;
+    lcd.contrast = 0.17;
+    state = 'shelf';
+  }
+
+  /* ==================================================================
+   * 한 판 — 그리기
+   * ================================================================ */
+
+  let last = performance.now();
   function frame(now) {
+    const dt = Math.min(48, now - last);
+    last = now;
+
+    if (state !== 'play') {
+      stepRail(dt);
+      layoutRail();
+      if (state === 'shelf') syncNow();
+    }
+    if (state !== 'play') paintLcd(now);
+    if (state === 'play') {
+      stepPtr(dt);
+      paintPlay(now);
+    }
     requestAnimationFrame(frame);
-    const dt = lastNow ? Math.min(50, now - lastNow) : 16;
-    lastNow = now;
-    const t = now - started;
-
-    // 손을 떼면 가장 가까운 자리로 물린다 — 표 위에 정확히 서야
-    // 레퍼런스의 실루엣이 그대로 나온다
-    if (!drag && now - scrollAt > SCROLL_SNAP) scrollTo = Math.round(scrollTo);
-    scroll += (scrollTo - scroll) * SCROLL_EASE;
-    if (Math.abs(scrollTo - scroll) < 0.0008) scroll = scrollTo;
-    syncPanel(false);
-
-    if (open.dir !== 0) {
-      open.t = clamp(open.t + open.dir * dt / OPEN_MS, 0, 1);
-      if (open.t === 1 || open.t === 0) open.dir = 0;
-    }
-    graphEl.classList.toggle('is-open', open.t > 0.72);
-    stepRegister(dt);
-
-    layoutBeads(t, dt);
-    const col = nowColors(now);
-
-    cx.clearRect(0, 0, graphW, graphH);
-
-    if (open.t < 1) {
-      drawRoom(col);
-      drawChain(t, col);
-    }
-    if (open.t > 0) drawBlob(open.t, open.it || INTERACTIONS[0]);
-
-    const pieceA = clamp((open.t - 0.86) / 0.14, 0, 1);
-    if (pieceA > 0 && open.it) {
-      cx.globalAlpha = pieceA;
-      drawPiece(now, open.it);
-      cx.globalAlpha = 1;
-    }
   }
 
   /* ==================================================================
    * 입력
    * ================================================================ */
 
-  function beadAt(x, y) {
-    for (let i = order.length - 1; i >= 0; i--) {   // 큰 것부터
-      const b = order[i];
-      if (b.r > 8 && Math.hypot(x - b.x, y - b.y) <= b.r) return b;
-    }
-    return null;
+  const LAST = CARTS.length - 1;
+  const rubber = (p) => (!Number.isFinite(p) ? 0
+    : p < 0 ? p * 0.34 : p > LAST ? LAST + (p - LAST) * 0.34 : p);
+
+  function goto(i) {
+    rail.target = clamp(i, 0, LAST);
   }
 
-  const live = () => open.t === 0 && performance.now() - started > INTRO_MS * 0.6;
+  stageEl.addEventListener('pointerdown', (e) => {
+    if (state !== 'shelf') return;
+    stageEl.setPointerCapture(e.pointerId);
+    rail.drag = { x: e.clientX, from: rail.pos, moved: 0, t: performance.now(), v: 0 };
+    stageEl.classList.add('is-dragging');
+  });
 
-  function scrollBy(d) {
-    scrollTo += d;
-    scrollAt = performance.now();
+  stageEl.addEventListener('pointermove', (e) => {
+    const d = rail.drag;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    d.moved = Math.max(d.moved, Math.abs(dx));
+    const next = rubber(d.from - dx / stepPx());
+    const now = performance.now();
+    const span = Math.max(1, now - d.t);
+    d.v = d.v * 0.6 + ((next - rail.pos) / span * 16.7) * 0.4;
+    d.t = now;
+    rail.pos = next;
+  });
+
+  function endDrag(e) {
+    const d = rail.drag;
+    if (!d) return;
+    rail.drag = null;
+    stageEl.classList.remove('is-dragging');
+    if (stageEl.hasPointerCapture?.(e.pointerId)) stageEl.releasePointerCapture(e.pointerId);
+
+    // 튕기면 그만큼 더 간다 — 거리보다 속도를 본다
+    rail.vel = clamp(d.v, -0.6, 0.6);
+    goto(Math.round(rail.pos + rail.vel * 2.6));
+
+    if (d.moved < 6) {
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      const chip = under && under.closest ? under.closest('.chip') : null;
+      const i = chip ? Number(chip.dataset.i) : -1;
+      if (i >= 0) {
+        if (i === focus && Math.abs(rail.pos - focus) < 0.35) insert();
+        else goto(i);
+      }
+    }
   }
+  stageEl.addEventListener('pointerup', endDrag);
+  stageEl.addEventListener('pointercancel', endDrag);
 
-  window.addEventListener('pointermove', (e) => {
-    cursorEl.style.transform = 'translate3d(' + e.clientX + 'px,' + e.clientY + 'px,0)';
-    cursorEl.classList.add('is-on');
-
-    // 열린 인터랙션 안에서는 판을 끈다
-    if (open.t >= 1) {
-      cursorEl.classList.remove('is-over');
-      if (!drag || !open.it || open.it.piece !== 'register') return;
-      const lim = unit * REG_RANGE;
-      const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
-      const d = Math.hypot(dx, dy) || 1;
-      const s = Math.min(1, lim / d);
-      reg.tx = dx * s; reg.ty = dy * s;
-      drag.moved = Math.max(drag.moved, d);
-      return;
+  stageEl.addEventListener('wheel', (e) => {
+    if (state !== 'shelf') return;
+    e.preventDefault();
+    const now = performance.now();
+    if (now - rail.wheelAt > 220) rail.wheel = 0;
+    rail.wheelAt = now;
+    rail.wheel += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (Math.abs(rail.wheel) > 42) {
+      goto(Math.round(rail.target) + Math.sign(rail.wheel));
+      rail.wheel = 0;
     }
+  }, { passive: false });
 
-    if (!live()) { hoverSlot = null; cursorEl.classList.remove('is-over'); return; }
+  addEventListener('keydown', (e) => {
+    if (state === 'inserting') { skipSequence(); return; }
+    if (e.key === 'Escape') { eject(); return; }
+    if (state !== 'shelf') return;
+    if (e.key === 'ArrowRight') { goto(Math.round(rail.target) + 1); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft') { goto(Math.round(rail.target) - 1); e.preventDefault(); }
+    else if (e.key === 'Enter' || e.key === ' ') { insert(); e.preventDefault(); }
+  });
 
-    if (drag) {
-      drag.moved = Math.max(drag.moved, Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0));
-      scrollBy((drag.y - e.clientY) * SCROLL_GAIN * 2.4);
-      drag.y = e.clientY;
-      return;
+  // 삽입 중에 화면을 누르면 끝으로 건너뛴다 — 기다리게 두지 않는다
+  addEventListener('pointerdown', () => { if (state === 'inserting') skipSequence(); }, true);
+
+  ejectEl.addEventListener('click', eject);
+
+  playCv.addEventListener('pointerdown', (e) => {
+    playCv.setPointerCapture(e.pointerId);
+    ptr.down = true;
+    ptr.ox = e.clientX;
+    ptr.oy = e.clientY;
+  });
+  playCv.addEventListener('pointermove', (e) => {
+    ptr.x = e.clientX / (playW || window.innerWidth);
+    ptr.y = e.clientY / (playH || window.innerHeight);
+    if (!ptr.down) return;
+    const unit = Math.min(playW, playH) * 0.34;
+    ptr.tx = clamp((e.clientX - ptr.ox) / unit, -1, 1);
+    ptr.ty = clamp((e.clientY - ptr.oy) / unit, -1, 1);
+  });
+  function playUp(e) {
+    ptr.down = false;
+    playCv.releasePointerCapture?.(e.pointerId);
+  }
+  playCv.addEventListener('pointerup', playUp);
+  playCv.addEventListener('pointercancel', playUp);
+
+  addEventListener('resize', () => {
+    readSizes();
+    repaintArt();
+    sizePlay();
+    if (state === 'play') {
+      stageEl.style.transition = 'none';
+      stageEl.style.transform = zoomTransform();
     }
-
-    const b = beadAt(e.clientX, e.clientY);
-    hoverSlot = b ? b.n : null;
-    cursorEl.classList.toggle('is-over', !!b);
-  }, { passive: true });
-
-  window.addEventListener('pointerdown', (e) => {
-    if (open.t > 0 && open.t < 1) return;
-    drag = { x0: e.clientX, y0: e.clientY, y: e.clientY, moved: 0 };
-    if (open.t >= 1 && open.it && open.it.piece === 'register') reg.held = true;
-  });
-
-  window.addEventListener('pointerup', (e) => {
-    if (!drag) return;
-    const tapped = drag.moved < TAP_SLOP;
-    drag = null;
-    reg.held = false;
-    scrollAt = performance.now();
-    if (!tapped || !live()) return;
-
-    const b = beadAt(e.clientX, e.clientY);
-    if (!b) return;
-
-    // 메인 자리에 선 구슬만 열린다. 다른 걸 누르면 열지 않고
-    // 먼저 가운데로 데려온다 — 한 번 더 눌러야 안으로 들어간다.
-    if (b.n !== Math.round(scrollTo)) {
-      scrollTo = b.n;
-      scrollAt = performance.now();
-      hoverSlot = null;
-      cursorEl.classList.remove('is-over');
-      return;
-    }
-
-    open.x = b.x;
-    open.y = b.y;
-    open.it = b.it;
-    open.r0 = Math.max(26, b.r * 0.34);
-    open.dir = 1;
-    scrollTo = b.n;
-    hoverSlot = null;
-    cursorEl.classList.remove('is-over');
-  });
-
-  document.addEventListener('pointerleave', () => cursorEl.classList.remove('is-on'));
-
-  window.addEventListener('pointercancel', () => {
-    drag = null;
-    reg.held = false;
-  });
-
-  closeEl.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (open.t >= 1) { open.dir = -1; reg.held = false; }
-  });
-
-  window.addEventListener('wheel', (e) => {
-    if (open.t > 0) return;
-    scrollBy(e.deltaY * SCROLL_GAIN);
-  }, { passive: true });
-
-  let touchY = null;
-  window.addEventListener('touchstart', (e) => { touchY = e.touches[0].clientY; }, { passive: true });
-  window.addEventListener('touchmove', (e) => {
-    if (touchY === null || open.t > 0) return;
-    const y = e.touches[0].clientY;
-    scrollBy((touchY - y) * SCROLL_GAIN * 2.4);
-    touchY = y;
-  }, { passive: true });
-
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && open.t >= 1) { open.dir = -1; return; }
-    if (open.t > 0) return;
-    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); scrollBy(-1); }
-    else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); scrollBy(1); }
   });
 
   /* ==================================================================
-   * 시작 / 리사이즈
+   * 시작 — 칩이 차례로 자리를 잡는다
    * ================================================================ */
 
-  sizeCanvas();
-  syncPanel(true);
-  started = performance.now();
-  lastNow = 0;
-  requestAnimationFrame(frame);
-  requestAnimationFrame(() => rootEl.classList.add('is-ready'));
-
-  let resizeTimer = 0;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(sizeCanvas, 140);
+  readSizes();
+  sizePlay();
+  layoutRail();
+  nowNoEl.textContent = CARTS[0].no;
+  nowTitleEl.textContent = CARTS[0].title;
+  nowSubEl.textContent = CARTS[0].mode + ' · ' + CARTS[0].palette;
+  requestAnimationFrame(() => {
+    repaintArt();
+    root.classList.add('is-ready');
+    if (!REDUCED) {
+      chips.forEach((chip, i) => {
+        chip.animate([
+          { opacity: 0, transform: chip.style.transform + ' translateY(14px)' },
+          { opacity: 1, transform: chip.style.transform },
+        ], { duration: 520, delay: 60 + Math.abs(i - focus) * 45, easing: EASE.out, fill: 'backwards' });
+      });
+    }
   });
+  document.fonts?.ready.then(repaintArt);
+  requestAnimationFrame(frame);
 })();
