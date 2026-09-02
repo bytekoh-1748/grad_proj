@@ -1,3 +1,17 @@
+import {
+  clamp,
+  EASE,
+  FACE_FONT,
+  FAN,
+  IDLE_POINTER,
+  lerp,
+  PLUCK_EASE,
+  REDUCED_MOTION,
+  TIMING,
+} from './src/config.js';
+import { createCartridgeFace, paintCartridgeArt } from './src/cartridge-face.js';
+import { getInteractions } from './src/interactions/index.js';
+
 (() => {
   'use strict';
 
@@ -14,232 +28,18 @@
    * 확대)만 길게 간다. 도중에 아무 키나 누르면 끝으로 건너뛴다.
    * ================================================================ */
 
-  const TAU = Math.PI * 2;
-  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-  const lerp = (a, b, t) => a + (b - a) * t;
+  const interactions = getInteractions();
+  if (!interactions.length) throw new Error('No interactions have been registered.');
 
-  const EASE = {
-    out:    'cubic-bezier(0.23, 1, 0.32, 1)',
-    inOut:  'cubic-bezier(0.77, 0, 0.175, 1)',
-    drawer: 'cubic-bezier(0.32, 0.72, 0, 1)',
-  };
-
-  const MS = {
-    flight: 520,   // 칩이 슬롯 위까지 이동하는 시간
-    seat:   320,   // 슬롯 뒤로 내려가는 시간
-    power:  220,   // 화면에 불이 드는 시간
-    boot:   760,   // 마크가 내려와 머무는 시간
-    zoom:   780,   // 화면 안으로 들어가는 시간
-    fade:   200,   // 도트가 실물로 바뀌는 순간
-    out:    620,   // 되돌아 나오는 시간
-  };
-
-  const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  const FACE_FONT = "'Quantico', 'Pretendard Variable', Pretendard, sans-serif";
-  const GLYPHS = 'AERTNSOMU0123456789@#%&*';
-
-  /* ---- 잉크 — 한 화면에 두 도까지 ---------------------------------- */
-  const INK = {
-    ultramarine: '#263E99', safetyOrange: '#E55D2B',
-    cobalt: '#2148B8', terracotta: '#C65F38',
-    botanicalGreen: '#008A4B', oxblood: '#8F3434',
-    signalRed: '#C83232',
-    mintGreen: '#5EB783', warmCharcoal: '#302D2E',
-    cyan: '#159DDA', brickRed: '#B64032',
-  };
-  const PAPER = { white: '#FAFAF7', gray: '#E9E9E5', beige: '#F5F1E8' };
-
-  /* ==================================================================
-   * 카트리지 여섯 장
-   *   body/fg  칩(과 카트리지)의 몸과 그 위의 글자
-   *   ink/paper 화면 안에서 쓰는 잉크와 종이
-   * ================================================================ */
-  const CARTS = [
-    {
-      no: '01', title: 'Out of Register', scene: 'register',
-      mode: 'OVERPRINT', palette: 'ULTRAMARINE + SAFETY ORANGE',
-      hint: 'DRAG TO PULL THE PLATES APART',
-      body: INK.ultramarine, fg: PAPER.white,
-      ink: INK.ultramarine, paper: PAPER.white,
-    },
-    {
-      no: '02', title: 'The Size of the Dot', scene: 'halftone',
-      mode: 'DUOTONE', palette: 'COBALT + TERRACOTTA',
-      hint: 'MOVE TO GROW THE DOTS',
-      body: INK.terracotta, fg: PAPER.beige,
-      ink: INK.cobalt, paper: PAPER.white,
-    },
-    {
-      no: '03', title: 'Room on the Paper', scene: 'bars',
-      mode: 'DUOTONE', palette: 'BOTANICAL GREEN + OXBLOOD',
-      hint: 'MOVE TO PUSH THE TYPE ASIDE',
-      body: INK.botanicalGreen, fg: PAPER.beige,
-      ink: INK.botanicalGreen, paper: PAPER.beige,
-    },
-    {
-      no: '04', title: 'Density of One Ink', scene: 'density',
-      mode: 'ONE INK', palette: 'SIGNAL RED',
-      hint: 'MOVE UP AND DOWN TO SET THE DENSITY',
-      body: INK.signalRed, fg: PAPER.white,
-      ink: INK.signalRed, paper: PAPER.white,
-    },
-    {
-      no: '05', title: 'Order of the Plates', scene: 'overprint',
-      mode: 'CHROMATIC + BLACK', palette: 'MINT GREEN + WARM CHARCOAL',
-      hint: 'MOVE TO CHANGE WHICH PLATE LANDS FIRST',
-      body: INK.mintGreen, fg: INK.warmCharcoal,
-      ink: INK.warmCharcoal, paper: PAPER.gray,
-    },
-    {
-      no: '06', title: 'The Body of a Letter', scene: 'type',
-      mode: 'OVERPRINT', palette: 'CYAN + BRICK RED',
-      hint: 'MOVE TO UNSETTLE THE LETTERS',
-      body: INK.cyan, fg: PAPER.white,
-      ink: INK.brickRed, paper: PAPER.gray,
-    },
-  ];
-
-  /* ==================================================================
-   * 장면 — 칩 위의 무늬, 화면 속 도트, 확대된 실물이 모두 같은 함수다.
-   * 크기만 바뀐다.
-   *
-   *   g  캔버스, W×H  그리는 크기, t  시간(ms), ink  잉크 한 도
-   *   p  손의 자리 { x, y: 0..1, dx, dy: -1..1, down }
-   * ================================================================ */
-
-  const IDLE = { x: 0.5, y: 0.5, dx: 0, dy: 0, down: false };
-
-  const SCENES = {
-    // 어긋난 판 — 같은 그림이 두 번, 조금 밀려서
-    register(g, W, H, t, ink, p) {
-      const S = Math.min(W, H);
-      const ox = p.dx * S * 0.30 + Math.sin(t * 0.0006) * S * 0.014;
-      const oy = p.dy * S * 0.30 + Math.cos(t * 0.0008) * S * 0.014;
-      g.fillStyle = ink;
-      g.strokeStyle = ink;
-      g.lineWidth = S * 0.017;
-      for (let k = 0; k < 2; k++) {
-        const s = k ? 0.5 : -0.5;
-        g.globalAlpha = 0.56;
-        g.beginPath();
-        g.arc(W * 0.5 + ox * s, H * 0.40 + oy * s, S * 0.19, 0, TAU);
-        g.fill();
-        for (let i = 0; i < 3; i++) {
-          const y = H * 0.66 + i * S * 0.082 + oy * s;
-          g.beginPath();
-          g.moveTo(W * 0.14 + ox * s, y);
-          g.lineTo(W * 0.86 + ox * s, y);
-          g.stroke();
-        }
-      }
-      g.globalAlpha = 1;
-    },
-
-    // 망점 — 점의 크기로만 어두워진다
-    halftone(g, W, H, t, ink, p) {
-      const cell = Math.min(W, H) / 9.5;
-      const cols = Math.max(2, Math.round(W / cell));
-      const rows = Math.max(2, Math.round(H / cell));
-      const cw = W / cols, ch = H / rows;
-      const px = p.x * W, py = p.y * H;
-      const reach = Math.hypot(W, H) * 0.56;
-      g.fillStyle = ink;
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          const x = (c + 0.5) * cw, y = (r + 0.5) * ch;
-          const d = Math.hypot(x - px, y - py) / reach;
-          const v = clamp(1.04 - d + 0.2 * Math.sin(t * 0.0012 - d * 5.5), 0, 1);
-          if (v < 0.04) continue;
-          g.beginPath();
-          g.arc(x, y, Math.min(cw, ch) * 0.5 * Math.sqrt(v), 0, TAU);
-          g.fill();
-        }
-      }
-    },
-
-    // 여백 — 막대가 밀리며 종이를 드러낸다
-    bars(g, W, H, t, ink, p) {
-      const rows = 11, h = H / rows;
-      const push = (p.x - 0.5) * 2;
-      g.fillStyle = ink;
-      for (let r = 0; r < rows; r++) {
-        const d = (push * 0.30 + Math.sin(t * 0.0009 + r * 0.7) * 0.10) * W;
-        const w = W * (0.24 + 0.26 * Math.abs(Math.sin(r * 1.3)));
-        g.globalAlpha = r % 2 ? 0.92 : 0.5;
-        g.fillRect(W * 0.5 - w / 2 + d, r * h + h * 0.24, w, h * 0.52);
-      }
-      g.globalAlpha = 1;
-    },
-
-    // 한 도의 밀도 — 같은 잉크가 성기게, 짙게
-    density(g, W, H, t, ink, p) {
-      const rows = 9, h = H / rows;
-      g.fillStyle = ink;
-      for (let r = 0; r < rows; r++) {
-        const u = (r + 0.5) / rows;
-        const a = clamp(1.06 - Math.abs(u - p.y) * 2.2
-          + 0.13 * Math.sin(t * 0.0007 + u * 6), 0.05, 1);
-        g.globalAlpha = a;
-        g.fillRect(0, r * h, W, h * 0.99);
-      }
-      g.globalAlpha = 1;
-    },
-
-    // 판의 차례 — 먼저 앉은 도 위에 다음 도가 얹힌다
-    overprint(g, W, H, t, ink, p) {
-      const S = Math.min(W, H);
-      const w = S * 0.5;
-      const d = S * 0.15;
-      const a = t * 0.0006 + (p.x - 0.5) * 3.6;
-      const n = Math.max(1, Math.round(W / (S * 0.92)));
-      g.fillStyle = ink;
-      g.globalAlpha = 0.5;
-      for (let i = 0; i < n; i++) {
-        const cx = W * (i + 0.5) / n;
-        for (let k = 0; k < 2; k++) {
-          const s = k ? 1 : -1;
-          g.fillRect(cx - w / 2 + s * Math.cos(a + i) * d,
-                     H / 2 - w / 2 + s * Math.sin(a + i) * d, w, w);
-        }
-      }
-      g.globalAlpha = 1;
-    },
-
-    // 글자의 몸 — 낱말이 도형이 되는 자리
-    type(g, W, H, t, ink, p) {
-      const cell = Math.min(W, H) / 3.1;
-      const cols = Math.max(1, Math.round(W / cell));
-      const rows = Math.max(1, Math.round(H / cell));
-      const cw = W / cols, ch = H / rows;
-      const px = p.x * W, py = p.y * H;
-      const reach = Math.hypot(W, H) * 0.42;
-      g.fillStyle = ink;
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.font = '700 ' + (Math.min(cw, ch) * 0.94).toFixed(1) + 'px ' + FACE_FONT;
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          const x = (c + 0.5) * cw, y = (r + 0.5) * ch;
-          const near = clamp(1 - Math.hypot(x - px, y - py) / reach, 0, 1);
-          const spin = t * 0.0007 * (1 + near * 8) + r * 13 + c * 7;
-          g.globalAlpha = 0.26 + 0.64 * Math.abs(Math.sin(t * 0.0009 + (r + c) * 0.8));
-          g.fillText(GLYPHS[Math.floor(Math.abs(spin)) % GLYPHS.length], x, y);
-        }
-      }
-      g.globalAlpha = 1;
-    },
-  };
+  /* 인터랙션의 메타데이터와 render()는 src/interactions에 독립 등록된다. */
 
   /* ==================================================================
    * 자리
    * ================================================================ */
 
-  const root = document.documentElement;
   const roomEl = document.getElementById('room');
   const stageEl = document.getElementById('stage');
   const railEl = document.getElementById('rail');
-  const deckEl = document.getElementById('deck');
   const seatEl = document.getElementById('seat');
   const consoleEl = document.getElementById('console');
   const ledEl = document.getElementById('led');
@@ -264,110 +64,9 @@
 
   const playG = playCv.getContext('2d');
 
-  const samp = document.createElement('canvas');
-  const sampG = samp.getContext('2d', { willReadFrequently: true });
-
-  /* ==================================================================
-   * 칩 한 장 만들기 — 선반의 칩, 날아가는 칩, 꽂힌 카트리지가 모두 같다
-   * ================================================================ */
-
-  const SIGN = 'M3 27 C 9 9, 15 5, 17 15 C 19 25, 13 30, 12 23 C 11 15, 21 9, 30 19 '
-             + 'C 36 25, 41 23, 45 13 C 48 5, 53 7, 51 17 C 49 27, 43 30, 45 21 '
-             + 'C 47 12, 59 9, 67 18 C 73 24, 80 22, 97 11';
-
-  function faceEl(cart, width) {
-    const el = document.createElement('div');
-    el.className = 'face';
-    el.style.setProperty('--w', width + 'px');
-    el.style.setProperty('--h', (width / 0.76) + 'px');
-    el.style.setProperty('--body', cart.body);
-    el.style.setProperty('--fg', cart.fg);
-    el.innerHTML =
-      '<span class="face-grip">' + '<i></i>'.repeat(14) + '</span>' +
-      '<canvas class="face-art"></canvas>' +
-      '<h3 class="face-title"><span>Interaction</span>' + cart.title + '</h3>' +
-      '<div class="face-meta">' +
-        '<span><b>MODE</b><em>' + cart.mode + '</em></span>' +
-        '<span><b>CART</b><em>NO. ' + cart.no + '</em></span>' +
-      '</div>' +
-      '<svg class="face-sign" viewBox="0 0 100 34" preserveAspectRatio="xMinYMid meet" aria-hidden="true">' +
-        '<path d="' + SIGN + '"/></svg>' +
-      '<span class="face-rule"></span>' +
-      '<span class="face-shade"></span>';
-    return el;
-  }
-
-  /* 이미 그려진 칩을 그대로 복제한다. canvas는 cloneNode가 픽셀을
-     복사하지 않으므로 비트맵까지 옮겨 패키지 모양을 유지한다. */
-  function cloneFace(source) {
-    const clone = source.cloneNode(true);
-    const fromCanvases = source.querySelectorAll('canvas');
-    clone.querySelectorAll('canvas').forEach((to, i) => {
-      const from = fromCanvases[i];
-      to.width = from.width;
-      to.height = from.height;
-      to.getContext('2d').drawImage(from, 0, 0);
-    });
-    return clone;
-  }
-
-  /* 칩 위의 무늬 — 장면을 낮은 해상도로 떠서 네모 칸으로 찍는다 */
-  function paintChipArt(cv, cart) {
-    const w = cv.clientWidth, h = cv.clientHeight;
-    if (!w || !h) return;
-
-    const cols = 30, rows = 13, SS = 4;
-    samp.width = cols * SS;
-    samp.height = rows * SS;
-    sampG.clearRect(0, 0, samp.width, samp.height);
-    sampG.save();
-    SCENES[cart.scene](sampG, samp.width, samp.height, cart.seed || 0, '#ffffff', IDLE);
-    sampG.restore();
-    const px = sampG.getImageData(0, 0, samp.width, samp.height).data;
-
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    cv.width = Math.round(w * dpr);
-    cv.height = Math.round(h * dpr);
-    const g = cv.getContext('2d');
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    g.clearRect(0, 0, w, h);
-
-    const cw = w / cols, ch = h / rows;
-    const sq = Math.min(cw, ch) * 0.76;
-    g.fillStyle = cart.fg;
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        let acc = 0;
-        for (let j = 0; j < SS; j++) {
-          for (let i = 0; i < SS; i++) {
-            acc += px[(((r * SS + j) * samp.width) + (c * SS + i)) * 4 + 3];
-          }
-        }
-        const v = acc / (SS * SS * 255);
-        if (v < 0.06) continue;
-        g.globalAlpha = 0.2 + 0.8 * Math.min(1, v * 1.3);
-        g.fillRect(c * cw + (cw - sq) / 2, r * ch + (ch - sq) / 2, sq, sq);
-      }
-    }
-    g.globalAlpha = 1;
-  }
-
   /* ==================================================================
    * 선반 — 부채처럼 겹친 칩
    * ================================================================ */
-
-  const FAN = {
-    gapNear: 0.98,   // 초점 카드와 바로 옆 카드 사이의 중심 간격
-    gapFar: 0.34,    // 두 번째부터 같은 폭만 드러내며 겹친다
-    yaw: 22,         // 좌우 카드 면이 중앙을 바라보는 Y축 원근 각도
-    //
-    // 초점 이외의 카드는 같은 크기다. 가운데 카드만 한 뼘 크게 두어
-    // 양옆의 파일이 동일한 리듬으로 포개진다.
-    base: 0.86,      // 원근 회전 뒤 레퍼런스와 같은 겉보기 크기를 만든다
-    peak: 3.0,       // 초점만 커지는 좁기
-    dim: 0.5,        // 뒤로 갈수록 어둑해지는 빠르기
-    shade: 0.10,
-  };
 
   /* 바로 옆 칩까지의 실제 거리 — 끌 때의 한 칸이기도 하다 */
   const stepPx = () => Math.abs(fanX(1)) || cardW;
@@ -377,20 +76,20 @@
     return FAN.base + (1 - FAN.base) * Math.exp(-FAN.peak * Math.abs(d));
   }
 
-  const INITIAL = Math.floor((CARTS.length - 1) / 2);
+  const INITIAL = Math.floor((interactions.length - 1) / 2);
   const chips = [];
   const rail = { pos: INITIAL, target: INITIAL, drag: null, wheel: 0, wheelAt: 0 };
   let focus = INITIAL;
   let cardW = 0, cardH = 0;
+  let away = -1;           // 지금 선반을 떠나 있는 칩. layoutRail 이 손대지 않는다
   let state = 'shelf';     // shelf | inserting | play | ejecting
 
-  CARTS.forEach((cart, i) => {
-    cart.seed = 900 + i * 1700;
+  interactions.forEach((interaction, i) => {
     const chip = document.createElement('div');
     chip.className = 'chip';
     chip.dataset.i = String(i);
     chip.setAttribute('role', 'option');
-    chip.appendChild(faceEl(cart, 200));
+    chip.appendChild(createCartridgeFace(interaction, 200));
     railEl.appendChild(chip);
     chip._shade = chip.querySelector('.face-shade');
     chip._art = chip.querySelector('.face-art');
@@ -399,7 +98,11 @@
 
   const probe = document.createElement('div');
   probe.className = 'probe';
-  railEl.appendChild(probe);
+  document.body.appendChild(probe);
+
+  const cartProbe = document.createElement('div');
+  cartProbe.className = 'probe probe-cart';
+  document.body.appendChild(cartProbe);
 
   function readSizes() {
     cardW = probe.getBoundingClientRect().width || 160;
@@ -413,7 +116,7 @@
   }
 
   function repaintArt() {
-    chips.forEach((chip, i) => paintChipArt(chip._art, CARTS[i]));
+    chips.forEach((chip, i) => paintCartridgeArt(chip._art, interactions[i]));
   }
 
   /* 초점에서 d 칸 떨어진 칩의 가로 자리.
@@ -430,6 +133,7 @@
   function layoutRail() {
     // 선택 카드를 화면의 고정된 중심축에 두고 양옆을 같은 식으로 포갠다.
     for (let i = 0; i < chips.length; i++) {
+      if (i === away) continue;      // 지금 기계 쪽에 가 있는 칩
       const d = i - rail.pos;
       const a = Math.abs(d);
       const x = fanX(d);
@@ -469,7 +173,7 @@
 
   function syncNow() {
     if (!Number.isFinite(rail.pos)) rail.pos = rail.target;
-    const i = clamp(Math.round(rail.pos), 0, CARTS.length - 1);
+    const i = clamp(Math.round(rail.pos), 0, interactions.length - 1);
     if (i !== focus) setNow(i);
   }
 
@@ -480,14 +184,21 @@
   const lcd = { power: 0, boot: -1, contrast: 0.17 };
 
   function paintLcd(now) {
-    const cart = CARTS[focus];
+    const interaction = interactions[focus];
     const on = lcd.power > 0.5;
-    const ground = on ? cart.paper : '#151711';
-    const ink = on ? cart.ink : '#8CA173';
+    const ground = on ? interaction.screen.paper : '#151711';
+    const ink = on ? interaction.screen.ink : '#8CA173';
 
     bufG.clearRect(0, 0, LCD_W, LCD_H);
     bufG.save();
-    SCENES[cart.scene](bufG, LCD_W, LCD_H, now, ink, IDLE);
+    interaction.render({
+      context: bufG,
+      width: LCD_W,
+      height: LCD_H,
+      time: now,
+      color: ink,
+      pointer: IDLE_POINTER,
+    });
     bufG.restore();
 
     lcdG.globalAlpha = 1;
@@ -510,20 +221,24 @@
 
     // 기동 — 마크가 위에서 내려와 한 박자 머문다
     if (lcd.boot >= 0) {
-      const b = clamp((now - lcd.boot) / MS.boot, 0, 1);
+      const b = clamp((now - lcd.boot) / TIMING.boot, 0, 1);
       const slide = b < 0.62 ? b / 0.62 : 1;
       const e = 1 - Math.pow(1 - slide, 3);
       const y = lerp(-LCD_H * 0.14, LCD_H * 0.2, e);
       lcdG.fillStyle = ground;
       lcdG.fillRect(0, 0, LCD_W, LCD_H);
-      lcdG.fillStyle = cart.ink;
+      lcdG.fillStyle = interaction.screen.ink;
       lcdG.textAlign = 'center';
       lcdG.textBaseline = 'middle';
       lcdG.font = '700 ' + (LCD_H * 0.125).toFixed(1) + 'px ' + FACE_FONT;
       lcdG.fillText('CRAFT BOY', LCD_W / 2, y);
       lcdG.font = '700 ' + (LCD_H * 0.055).toFixed(1) + 'px ' + FACE_FONT;
       lcdG.globalAlpha = b > 0.72 ? 1 : 0;
-      lcdG.fillText('ADVANCE  ·  NO. ' + cart.no, LCD_W / 2, y + LCD_H * 0.13);
+      lcdG.fillText(
+        'ADVANCE  ·  NO. ' + interaction.number,
+        LCD_W / 2,
+        y + LCD_H * 0.13,
+      );
       lcdG.globalAlpha = 1;
       if (b >= 1) lcd.boot = -1;
     }
@@ -559,12 +274,19 @@
 
   function paintPlay(now) {
     if (playCv.clientWidth !== playW || playCv.clientHeight !== playH) sizePlay();
-    const cart = CARTS[focus];
+    const interaction = interactions[focus];
     const W = playW, H = playH;
-    playG.fillStyle = cart.paper;
+    playG.fillStyle = interaction.screen.paper;
     playG.fillRect(0, 0, W, H);
     playG.save();
-    SCENES[cart.scene](playG, W, H, now, cart.ink, ptr);
+    interaction.render({
+      context: playG,
+      width: W,
+      height: H,
+      time: now,
+      color: interaction.screen.ink,
+      pointer: ptr,
+    });
     playG.restore();
   }
 
@@ -574,20 +296,62 @@
 
   const seq = { skip: false, timers: [], anims: [] };
 
-  /* 자리는 언제나 중심으로 잰다 — 돌아간 칩의 rect 는 카드보다 크게 잡힌다.
-     가운데 칩은 곧게 서 있으니 날아갈 때 펼 기울기는 없다. */
-  const RAIL_TILT = 0;
+  /* 칩은 어느 부모에 들어가든 제 상자의 한가운데를 기준으로 앉는다.
+     그래서 부모를 갈아 끼워도 그 중심만 다시 재면 화면 위 자리가
+     어긋나지 않는다 — 카드 한 장이 선반·허공·슬롯을 그대로 건너간다.
+     복제본이 없으니 패키지 도안도 하나뿐이다. */
 
   const midOf = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
 
-  function poseAt(cx, cy, s, rot) {
-    return 'translate(' + (cx - cardW / 2).toFixed(1) + 'px,'
-      + (cy - cardH / 2).toFixed(1) + 'px) '
-      + 'rotate(' + rot.toFixed(2) + 'deg) scale(' + s.toFixed(4) + ')';
+  /* 변형을 걷어낸 맨 자리의 중심. 재고 바로 되돌리므로 화면에는 남지 않는다. */
+  function restCenter(chip) {
+    const prev = chip.style.transform;
+    chip.style.transform = 'none';
+    const r = chip.getBoundingClientRect();
+    chip.style.transform = prev;
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+
+  function poseAt(o, cx, cy, s) {
+    return 'translate3d(' + (cx - o.x).toFixed(2) + 'px,'
+      + (cy - o.y).toFixed(2) + 'px,0) scale(' + s.toFixed(4) + ')';
+  }
+
+  /* 부모를 바꿔 달되 화면 위 자리는 그대로 둔다 */
+  function reparent(chip, parent, cx, cy, s) {
+    parent.appendChild(chip);
+    const o = restCenter(chip);
+    chip.style.transform = poseAt(o, cx, cy, s);
+    return o;
+  }
+
+  /* 끝난 자리를 인라인으로 못박고 애니메이션을 거둔다. 순서가 중요하다 —
+     먼저 써 두어야 거두는 순간에 한 프레임도 튀지 않는다. */
+  function land(chip, anim, pose) {
+    chip.style.transform = pose;
+    anim.cancel();
+  }
+
+  /* 슬롯에 앉은 칩의 자리. 잔줄과 무늬만 남기고 --cart-lip 만큼을
+     기계가 문다 — 도안은 선반에서 보던 그 조판 그대로다. */
+  function dockPose() {
+    const c = consoleEl.getBoundingClientRect();
+    const p = cartProbe.getBoundingClientRect();
+    const s = p.width / cardW;
+    return { x: c.left + c.width / 2, y: c.top + p.height - (cardH * s) / 2, s, lip: p.height };
+  }
+
+  /* 슬롯 바로 위 — 여기서 손을 떼고 아래로 눌러 넣는다 */
+  const hoverY = (d) => d.y - d.lip - cardH * d.s * 0.11;
+
+  /* 선반에서 칩이 서는 한 점. 모든 칩이 같은 자리를 기준으로 앉는다. */
+  function railHome() {
+    const r = railEl.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top };
   }
 
   function wait(ms) {
-    if (seq.skip || REDUCED) return Promise.resolve();
+    if (seq.skip || REDUCED_MOTION) return Promise.resolve();
     return new Promise((res) => {
       const id = setTimeout(() => {
         const n = seq.timers.findIndex((t) => t.id === id);
@@ -628,92 +392,93 @@
       + (-k * (cy - innerHeight / 2)).toFixed(2) + 'px) scale(' + k.toFixed(4) + ')';
   }
 
+  let zoomPose = '';
+
   async function insert() {
     if (state !== 'shelf') return;
     state = 'inserting';
     seq.skip = false;
 
-    const i = clamp(Math.round(rail.target), 0, CARTS.length - 1);
+    const i = clamp(Math.round(rail.target), 0, interactions.length - 1);
     if (i !== focus) setNow(i);
-    const cart = CARTS[i];
+    const interaction = interactions[i];
     const chip = chips[i];
 
-    const from = midOf(chip.getBoundingClientRect());
-    const to = seatEl.getBoundingClientRect();
-    const seat = midOf(to);
-    const dockY = consoleEl.getBoundingClientRect().top - to.height * 0.5 - 2;
-    const lift = seat.y - dockY;
-    const sc = to.width / cardW;
+    // 이 칩만 선반의 손에서 뗀다 — layoutRail 이 매 프레임 덮어쓰지 않도록
+    away = i;
+    chip.classList.remove('is-focus');
+    chip.setAttribute('role', 'presentation');
+    chip.setAttribute('aria-hidden', 'true');
 
-    // 날아가는 동안 선반은 물러난다
-    chip.classList.add('is-hidden');
+    const start = midOf(chip.getBoundingClientRect());
+    const s0 = scaleOf(i - rail.pos);
+    const dock = dockPose();
+    const hover = hoverY(dock);
+
+    // 남은 카드는 한 뼘 물러나고, 고른 한 장만 허공으로 옮겨 붙는다
+    const o = reparent(chip, flightEl, start.x, start.y, s0);
     railEl.classList.add('is-gone');
-    root.classList.add('is-leaving');
 
-    const flier = cloneFace(chip.firstElementChild);
-    flier.style.transform = poseAt(from.x, from.y, 1, RAIL_TILT);
-    flightEl.appendChild(flier);
+    // 한 번 뽑아 들었다가 슬롯 위로 가져간다. 가는 길이 곧으므로
+    // 마디마다 다른 이징을 섞지 않는다 — 위로 한 번, 아래로 한 번.
+    const fly = run(chip, [
+      { transform: poseAt(o, start.x, start.y, s0), easing: EASE.out },
+      { transform: poseAt(o, start.x, start.y - cardH * 0.09, s0 * 1.03),
+        offset: 0.26, easing: PLUCK_EASE },
+      { transform: poseAt(o, dock.x, hover, dock.s) },
+    ], { duration: REDUCED_MOTION ? 1 : TIMING.flight });
+    await fly.finished.catch(() => {});
+    land(chip, fly, poseAt(o, dock.x, hover, dock.s));
 
-    const a1 = run(flier, [
-      { transform: poseAt(from.x, from.y, 1, RAIL_TILT), easing: EASE.out },
-      { transform: poseAt(lerp(from.x, seat.x, 0.26), from.y - cardH * 0.14, 1.04, 0),
-        offset: 0.32, easing: EASE.inOut },
-      { transform: poseAt(seat.x, dockY - to.height * 0.12, sc * 1.012, 0),
-        offset: 0.74, easing: EASE.out },
-      { transform: poseAt(seat.x, dockY, sc, 0) },
-    ], { duration: REDUCED ? 1 : MS.flight });
-    await a1.finished.catch(() => {});
-
-    // 날아온 칩을 홈에 놓인 카트리지로 바꿔 단다 — 자리가 같아 티가 없다
-    seatEl.innerHTML = '';
-    const seatFace = cloneFace(chip.firstElementChild);
-    seatFace.style.width = cardW + 'px';
-    seatFace.style.height = cardH + 'px';
-    seatFace.style.transformOrigin = '0 0';
-    seatFace.style.transform = 'scale(' + sc.toFixed(4) + ')';
-    seatFace.style.transition = 'none';
-    seatEl.appendChild(seatFace);
-    seatEl.style.transform = 'translateY(' + (-lift) + 'px)';
+    // 여기서부터는 기계의 일부다. 아직 슬롯 위에 떠 있으므로
+    // 콘솔 뒤로 넘어가도 눈에 보이는 변화가 없다.
+    const so = reparent(chip, seatEl, dock.x, hover, dock.s);
     seatEl.classList.add('is-in');
-    flier.remove();
 
-    const a2 = run(seatEl, [
-      { transform: 'translateY(' + (-lift) + 'px)' },
-      { transform: 'translateY(2px)', offset: 0.88, easing: EASE.drawer },
-      { transform: 'translateY(0)' },
-    ], { duration: REDUCED ? 1 : MS.seat });
+    const push = run(chip, [
+      { transform: poseAt(so, dock.x, hover, dock.s) },
+      { transform: poseAt(so, dock.x, dock.y + 2, dock.s), offset: 0.84 },
+      { transform: poseAt(so, dock.x, dock.y, dock.s) },
+    ], { duration: REDUCED_MOTION ? 1 : TIMING.seat, easing: EASE.drawer });
 
+    // 다 눌린 순간 기계가 한 번 받는다
     setTimeout(() => {
-      if (REDUCED) return;
+      if (REDUCED_MOTION || state !== 'inserting') return;
       consoleEl.animate([
         { transform: 'translateY(0)' },
         { transform: 'translateY(1.5px)' },
         { transform: 'translateY(0)' },
       ], { duration: 150, easing: 'ease-out' });
-    }, MS.seat * 0.76);
+    }, TIMING.seat * 0.72);
 
-    await a2.finished.catch(() => {});
-    seatEl.style.transform = 'translateY(0)';
-    a2.cancel();
+    await push.finished.catch(() => {});
+    land(chip, push, poseAt(so, dock.x, dock.y, dock.s));
 
     // 불이 든다
     ledEl.classList.add('is-on');
     lcd.power = 1;
     lcd.contrast = 1;
     lcd.boot = performance.now();
-    await wait(MS.power + MS.boot);
+    await wait(TIMING.power + TIMING.boot);
     lcd.boot = -1;
 
-    // 화면 안으로
-    if (!REDUCED) {
-      stageEl.style.transition = 'transform ' + MS.zoom + 'ms ' + EASE.inOut;
-      stageEl.style.transform = zoomTransform();
-      await wait(MS.zoom);
+    // 화면 안으로. 트랜지션이 아니라 애니메이션이라야 도중에 건너뛸 수 있다.
+    zoomPose = zoomTransform();
+    if (!REDUCED_MOTION) {
+      const z = run(stageEl, [
+        { transform: 'none' },
+        { transform: zoomPose },
+      ], { duration: TIMING.zoom, easing: EASE.out });
+      await z.finished.catch(() => {});
+      stageEl.style.transform = zoomPose;
+      z.cancel();
+    } else {
+      stageEl.style.transform = zoomPose;
     }
 
-    playTitleEl.textContent = cart.title;
-    playHintEl.textContent = cart.hint;
-    playEl.style.setProperty('--play-ink', cart.ink);
+    playTitleEl.textContent = interaction.title;
+    playHintEl.textContent = interaction.hint;
+    playEl.style.setProperty('--play-ink', interaction.screen.ink);
     playEl.setAttribute('aria-hidden', 'false');
     playEl.classList.add('is-on');
     roomEl.classList.add('is-inside');
@@ -729,50 +494,57 @@
     playEl.classList.remove('is-on');
     playEl.setAttribute('aria-hidden', 'true');
     roomEl.classList.remove('is-inside');
-    await wait(MS.fade);
+    await wait(TIMING.fade);
 
-    if (!REDUCED) {
-      stageEl.style.transition = 'transform ' + MS.out + 'ms ' + EASE.inOut;
-      stageEl.style.transform = 'none';
-      await wait(MS.out);
+    if (!REDUCED_MOTION && zoomPose) {
+      const z = run(stageEl, [
+        { transform: zoomPose },
+        { transform: 'none' },
+      ], { duration: TIMING.out, easing: EASE.out });
+      await z.finished.catch(() => {});
+      stageEl.style.transform = '';
+      z.cancel();
     } else {
-      stageEl.style.transform = 'none';
+      stageEl.style.transform = '';
     }
+    zoomPose = '';
 
-    // 슬롯의 칩이 삽입 때의 크기 변화를 거꾸로 밟아 제자리로 돌아간다.
+    // 들어온 길을 그대로 되짚는다 — 슬롯에서 뽑히고, 선반으로 돌아간다
     const chip = chips[focus];
-    const slotRect = seatEl.getBoundingClientRect();
-    const slot = midOf(slotRect);
-    const dockY = consoleEl.getBoundingClientRect().top - slotRect.height * 0.5 - 2;
-    const lift = slot.y - dockY;
-    const sc = slotRect.width / cardW;
+    const dock = dockPose();
+    const hover = hoverY(dock);
+    const so = restCenter(chip);
 
-    // 먼저 실제 슬롯 안의 카트리지가 기기 뒤에서 위로 빠져나온다.
-    const up = run(seatEl, [
-      { transform: 'translateY(0)' },
-      { transform: 'translateY(' + (-lift) + 'px)' },
-    ], { duration: REDUCED ? 1 : 260, easing: EASE.out });
-    await up.finished.catch(() => {});
+    const pull = run(chip, [
+      { transform: poseAt(so, dock.x, dock.y, dock.s) },
+      { transform: poseAt(so, dock.x, hover, dock.s) },
+    ], { duration: REDUCED_MOTION ? 1 : TIMING.seat, easing: EASE.out });
+    await pull.finished.catch(() => {});
+    land(chip, pull, poseAt(so, dock.x, hover, dock.s));
 
-    railEl.classList.remove('is-gone');
-    root.classList.remove('is-leaving');
-
-    const destination = midOf(chip.getBoundingClientRect());
-    const flier = cloneFace(chip.firstElementChild);
-    flier.style.transform = poseAt(slot.x, dockY, sc, 0);
-    flightEl.appendChild(flier);
     seatEl.classList.remove('is-in');
-    up.cancel();
-    seatEl.style.transform = 'translateY(0)';
-    seatEl.innerHTML = '';
+    const o = reparent(chip, flightEl, dock.x, hover, dock.s);
+    railEl.classList.remove('is-gone');
 
-    await (run(flier, [
-      { transform: poseAt(slot.x, dockY, sc, 0) },
-      { transform: poseAt(destination.x, destination.y, 1, RAIL_TILT) },
-    ], { duration: REDUCED ? 1 : MS.flight, easing: EASE.inOut }).finished.catch(() => {}));
+    const home = railHome();
+    const back = run(chip, [
+      { transform: poseAt(o, dock.x, hover, dock.s) },
+      { transform: poseAt(o, dock.x, hover - cardH * dock.s * 0.10, dock.s),
+        offset: 0.24, easing: PLUCK_EASE },
+      { transform: poseAt(o, home.x, home.y, 1) },
+    ], { duration: REDUCED_MOTION ? 1 : TIMING.flight, easing: EASE.out });
+    await back.finished.catch(() => {});
 
-    chip.classList.remove('is-hidden');
-    flier.remove();
+    // 선반이 다시 이 칩의 자리를 맡는다. 만든 차례 그대로 끼워 넣어야
+    // 좌우 대칭인 이웃의 겹침 순서가 바뀌지 않는다.
+    railEl.insertBefore(chip, chips[focus + 1] || null);
+    chip.setAttribute('role', 'option');
+    chip.removeAttribute('aria-hidden');
+    away = -1;
+    rail.pos = focus;
+    rail.target = focus;
+    layoutRail();
+    back.cancel();
 
     ledEl.classList.remove('is-on');
     lcd.power = 0;
@@ -806,7 +578,7 @@
    * 입력
    * ================================================================ */
 
-  const LAST = CARTS.length - 1;
+  const LAST = interactions.length - 1;
 
   function goto(i) {
     rail.target = clamp(i, 0, LAST);
@@ -902,9 +674,15 @@
     readSizes();
     repaintArt();
     sizePlay();
+    // 슬롯에 앉아 있는 칩은 창이 바뀌면 자리를 다시 잡아야 한다
+    if (away >= 0 && chips[away].parentElement === seatEl) {
+      const chip = chips[away];
+      const d = dockPose();
+      chip.style.transform = poseAt(restCenter(chip), d.x, d.y, d.s);
+    }
     if (state === 'play') {
-      stageEl.style.transition = 'none';
-      stageEl.style.transform = zoomTransform();
+      zoomPose = zoomTransform();
+      stageEl.style.transform = zoomPose;
     }
   });
 
@@ -918,8 +696,7 @@
   setNow(INITIAL);
   requestAnimationFrame(() => {
     repaintArt();
-    root.classList.add('is-ready');
-    if (!REDUCED) {
+    if (!REDUCED_MOTION) {
       chips.forEach((chip, i) => {
         chip.animate([
           { opacity: 0, transform: chip.style.transform + ' translateY(14px)' },
