@@ -18,14 +18,26 @@
     <!-- 확대의 주체 — 여기만 화면 안으로 밀려 들어간다 -->
     <div class="stage" id="stage">
 
-      <!-- 칩 — 같은 크기의 카드가 부채처럼 겹친다 -->
+      <!-- 칩 — 오른쪽에서 파일 인덱스처럼 겹친다 -->
       <div class="rail" id="rail" role="listbox" aria-label="Interaction cartridges" tabindex="0"></div>
 
-      <!-- 도크 — 검은 판 하나와 그것을 거의 다 덮는 화면 -->
+      <!-- 도크 — 왼쪽에 놓인 선화형 게임기. 카트리지는 오른쪽 옆면으로 들어간다 -->
       <div class="deck" id="deck">
         <div class="seat" id="seat" aria-hidden="true"></div>
 
         <div class="console" id="console">
+          <span class="console-inset" aria-hidden="true"></span>
+          <span class="screw screw-nw" aria-hidden="true"></span>
+          <span class="screw screw-ne" aria-hidden="true"></span>
+          <span class="screw screw-sw" aria-hidden="true"></span>
+          <span class="screw screw-se" aria-hidden="true"></span>
+
+          <div class="console-mark" aria-hidden="true">
+            <strong>CRAFT BOY</strong>
+            <span>INTERACTION DRIVE / MODEL 06</span>
+          </div>
+
+          <span class="port-guide" aria-hidden="true"></span>
           <span class="slot" aria-hidden="true"></span>
 
           <div class="bezel">
@@ -35,6 +47,16 @@
             </div>
           </div>
 
+          <div class="controls" aria-hidden="true">
+            <span class="dpad"><i></i><i></i></span>
+            <span class="control-key key-a">A</span>
+            <span class="control-key key-b">B</span>
+          </div>
+
+          <div class="vent" aria-hidden="true">
+            <i></i><i></i><i></i><i></i><i></i><i></i>
+          </div>
+          <span class="port-label" aria-hidden="true">SIDE LOAD / PUSH ←</span>
           <span class="led" id="led" aria-hidden="true"></span>
         </div>
       </div>

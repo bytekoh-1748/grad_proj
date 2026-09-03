@@ -68,15 +68,15 @@ import { getInteractions } from './src/interactions/index.js';
    * 선반 — 부채처럼 겹친 칩
    * ================================================================ */
 
-  /* 바로 옆 칩까지의 실제 거리 — 끌 때의 한 칸이기도 하다 */
-  const stepPx = () => Math.abs(fanX(1)) || cardW;
+  /* 파일 스택에서 바로 옆 칩까지의 세로 거리 — 끌 때의 한 칸이기도 하다. */
+  const stepPx = () => cardH * 0.1144 || cardW;
 
   /* 초점만 한 뼘 앞으로 나온다. 나머지는 서로 같은 크기다. */
   function scaleOf(d) {
     return FAN.base + (1 - FAN.base) * Math.exp(-FAN.peak * Math.abs(d));
   }
 
-  const INITIAL = Math.floor((interactions.length - 1) / 2);
+  const INITIAL = Math.min(1, interactions.length - 1);
   const chips = [];
   const rail = { pos: INITIAL, target: INITIAL, drag: null, wheel: 0, wheelAt: 0 };
   let focus = INITIAL;
@@ -88,8 +88,10 @@ import { getInteractions } from './src/interactions/index.js';
     const chip = document.createElement('div');
     chip.className = 'chip';
     chip.dataset.i = String(i);
+    chip.dataset.tab = 'NO. ' + interaction.number;
     chip.setAttribute('role', 'option');
     chip.style.setProperty('--body', interaction.cartridge.body);
+    chip.style.setProperty('--tab-x', [6, 31, 50, 14, 42, 24][i % 6] + '%');
     chip.appendChild(createCartridgeFace(interaction, 200));
     railEl.appendChild(chip);
     chip._shade = chip.querySelector('.face-shade');
@@ -120,37 +122,20 @@ import { getInteractions } from './src/interactions/index.js';
     chips.forEach((chip, i) => paintCartridgeArt(chip._art, interactions[i]));
   }
 
-  /* 초점에서 d 칸 떨어진 칩의 가로 자리.
-     바로 옆은 거의 한 장 너비만큼 벌리고, 그 뒤는 같은 폭만 드러낸다. */
-  function fanX(d) {
-    const a = Math.abs(d), s = Math.sign(d);
-    if (!a) return 0;
-    const gap = a <= 1
-      ? FAN.gapNear * a
-      : FAN.gapNear + (a - 1) * FAN.gapFar;
-    return s * gap * cardW;
-  }
-
   function layoutRail() {
-    // 선택 카드를 화면의 고정된 중심축에 두고 양옆을 같은 식으로 포갠다.
+    // 선택 카드를 오른쪽 고정축에 두고 위아래의 카드를 파일처럼 포갠다.
     for (let i = 0; i < chips.length; i++) {
       if (i === away) continue;      // 지금 기계 쪽에 가 있는 칩
       const d = i - rail.pos;
       const a = Math.abs(d);
-      const x = fanX(d);
+      const x = Math.min(3, a) * cardW * 0.018;
+      const y = d * stepPx();
       const sc = scaleOf(d);
-      // 양쪽은 각각 한 방향의 3D 스택이다. 왼쪽 면은 오른쪽(중앙)을,
-      // 오른쪽 면은 왼쪽(중앙)을 보고 중앙으로 들어올 때만 정면으로 펴진다.
-      const turn = Math.min(1, a);
-      const ry = -Math.sign(d) * FAN.yaw * turn;
-      const depth = cardW * 0.025;
       const chip = chips[i];
-      chip.style.setProperty('--depth-z', (-depth).toFixed(2) + 'px');
-      chip.style.setProperty('--depth-mid-z', (-depth * 0.5).toFixed(2) + 'px');
       chip.style.transform =
-        'translate3d(' + x.toFixed(2) + 'px,0,0) ' +
-        'rotateY(' + ry.toFixed(2) + 'deg) scale(' + sc.toFixed(4) + ')';
-      chip.style.zIndex = String(100 - Math.round(a * 10));
+        'translate3d(' + x.toFixed(2) + 'px,' + y.toFixed(2) + 'px,0) ' +
+        'scale(' + sc.toFixed(4) + ')';
+      chip.style.zIndex = String(a < 0.5 ? 200 : 100 - Math.round(a * 10));
       chip.classList.toggle('is-focus', a < 0.5);
       chip._shade.style.opacity =
         (FAN.shade * (1 - Math.exp(-FAN.dim * a))).toFixed(3);
@@ -239,7 +224,7 @@ import { getInteractions } from './src/interactions/index.js';
       lcdG.font = '700 ' + (LCD_H * 0.055).toFixed(1) + 'px ' + FACE_FONT;
       lcdG.globalAlpha = b > 0.72 ? 1 : 0;
       lcdG.fillText(
-        'DOCK  ·  NO. ' + interaction.number,
+        'SIDE LOAD  ·  NO. ' + interaction.number,
         LCD_W / 2,
         y + LCD_H * 0.13,
       );
@@ -316,16 +301,17 @@ import { getInteractions } from './src/interactions/index.js';
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   }
 
-  function poseAt(o, cx, cy, s) {
+  function poseAt(o, cx, cy, s, rotation = 0) {
     return 'translate3d(' + (cx - o.x).toFixed(2) + 'px,'
-      + (cy - o.y).toFixed(2) + 'px,0) scale(' + s.toFixed(4) + ')';
+      + (cy - o.y).toFixed(2) + 'px,0) rotate(' + rotation.toFixed(2) + 'deg) '
+      + 'scale(' + s.toFixed(4) + ')';
   }
 
   /* 부모를 바꿔 달되 화면 위 자리는 그대로 둔다 */
-  function reparent(chip, parent, cx, cy, s) {
+  function reparent(chip, parent, cx, cy, s, rotation = 0) {
     parent.appendChild(chip);
     const o = restCenter(chip);
-    chip.style.transform = poseAt(o, cx, cy, s);
+    chip.style.transform = poseAt(o, cx, cy, s, rotation);
     return o;
   }
 
@@ -336,19 +322,24 @@ import { getInteractions } from './src/interactions/index.js';
     anim.cancel();
   }
 
-  /* 슬롯에 앉은 칩의 자리. 잔줄과 무늬만 남기고 --cart-lip 만큼을
-     기계가 문다 — 도안은 선반에서 보던 그 조판 그대로다. */
+  /* 오른쪽 옆면 슬롯의 자리. 세로 카드를 90도 돌린 뒤 왼쪽으로 밀어
+     전체 길이의 약 1/4만 손잡이처럼 본체 밖에 남긴다. */
   function dockPose() {
     const c = consoleEl.getBoundingClientRect();
     const p = cartProbe.getBoundingClientRect();
     const s = p.width / cardW;
-    return { x: c.left + c.width / 2, y: c.top + p.height - (cardH * s) / 2, s, lip: p.height };
+    const total = cardH * s;
+    const visible = total * 0.58;
+    return {
+      x: c.right + visible - total / 2,
+      approach: c.right + 22 + total / 2,
+      y: c.top + c.height * 0.527,
+      s,
+      total,
+    };
   }
 
-  /* 슬롯 바로 위 — 여기서 손을 떼고 아래로 눌러 넣는다 */
-  const hoverY = (d) => d.y - d.lip - cardH * d.s * 0.11;
-
-  /* 선반에서 칩이 서는 한 점. 모든 칩이 같은 자리를 기준으로 앉는다. */
+  /* 파일 스택에서 선택 칩이 서는 한 점. */
   function railHome() {
     const r = railEl.getBoundingClientRect();
     return { x: r.left + r.width / 2, y: r.top };
@@ -427,6 +418,7 @@ import { getInteractions } from './src/interactions/index.js';
 
     // 이 칩만 선반의 손에서 뗀다 — layoutRail 이 매 프레임 덮어쓰지 않도록
     away = i;
+    chip.classList.add('is-active');
     chip.classList.remove('is-focus');
     chip.setAttribute('role', 'presentation');
     chip.setAttribute('aria-hidden', 'true');
@@ -434,46 +426,43 @@ import { getInteractions } from './src/interactions/index.js';
     const start = midOf(chip.getBoundingClientRect());
     const s0 = scaleOf(i - rail.pos);
     const dock = dockPose();
-    const hover = hoverY(dock);
 
-    // 남은 카드는 한 뼘 물러나고, 고른 한 장만 허공으로 옮겨 붙는다
+    // 남은 파일은 오른쪽으로 물러나고, 고른 한 장만 허공으로 옮겨 붙는다.
     const o = reparent(chip, flightEl, start.x, start.y, s0);
     railEl.classList.add('is-gone');
 
-    // 한 번 뽑아 들었다가 슬롯 위로 가져간다. 가는 길이 곧으므로
-    // 마디마다 다른 이징을 섞지 않는다 — 위로 한 번, 아래로 한 번.
+    // 파일을 스택에서 왼쪽으로 뽑으며 가로로 돌려 포트 앞에 정렬한다.
     const fly = run(chip, [
       { transform: poseAt(o, start.x, start.y, s0), easing: EASE.out },
-      { transform: poseAt(o, start.x, start.y - cardH * 0.09, s0 * 1.03),
+      { transform: poseAt(o, start.x - cardW * 0.12, start.y - cardW * 0.03, s0 * 1.02, 24),
         offset: 0.26, easing: PLUCK_EASE },
-      { transform: poseAt(o, dock.x, hover, dock.s) },
+      { transform: poseAt(o, dock.approach, dock.y, dock.s, 90) },
     ], { duration: REDUCED_MOTION ? 1 : TIMING.flight });
     await fly.finished.catch(() => {});
-    land(chip, fly, poseAt(o, dock.x, hover, dock.s));
+    land(chip, fly, poseAt(o, dock.approach, dock.y, dock.s, 90));
 
-    // 여기서부터는 기계의 일부다. 아직 슬롯 위에 떠 있으므로
-    // 콘솔 뒤로 넘어가도 눈에 보이는 변화가 없다.
-    const so = reparent(chip, seatEl, dock.x, hover, dock.s);
+    // 포트 바깥에 정렬된 순간 본체 뒤 레이어로 넘겨 왼쪽으로 밀어 넣는다.
+    const so = reparent(chip, seatEl, dock.approach, dock.y, dock.s, 90);
     seatEl.classList.add('is-in');
 
     const push = run(chip, [
-      { transform: poseAt(so, dock.x, hover, dock.s) },
-      { transform: poseAt(so, dock.x, dock.y + 2, dock.s), offset: 0.84 },
-      { transform: poseAt(so, dock.x, dock.y, dock.s) },
+      { transform: poseAt(so, dock.approach, dock.y, dock.s, 90) },
+      { transform: poseAt(so, dock.x - 2, dock.y, dock.s, 90), offset: 0.84 },
+      { transform: poseAt(so, dock.x, dock.y, dock.s, 90) },
     ], { duration: REDUCED_MOTION ? 1 : TIMING.seat, easing: EASE.drawer });
 
     // 다 눌린 순간 기계가 한 번 받는다
     setTimeout(() => {
       if (REDUCED_MOTION || state !== 'inserting') return;
       consoleEl.animate([
-        { transform: 'translateY(0)' },
-        { transform: 'translateY(1.5px)' },
-        { transform: 'translateY(0)' },
+        { transform: 'translateX(0)' },
+        { transform: 'translateX(-1.5px)' },
+        { transform: 'translateX(0)' },
       ], { duration: 150, easing: 'ease-out' });
     }, TIMING.seat * 0.72);
 
     await push.finished.catch(() => {});
-    land(chip, push, poseAt(so, dock.x, dock.y, dock.s));
+    land(chip, push, poseAt(so, dock.x, dock.y, dock.s, 90));
 
     // 불이 든다
     ledEl.classList.add('is-on');
@@ -540,24 +529,23 @@ import { getInteractions } from './src/interactions/index.js';
     // 들어온 길을 그대로 되짚는다 — 슬롯에서 뽑히고, 선반으로 돌아간다
     const chip = chips[focus];
     const dock = dockPose();
-    const hover = hoverY(dock);
     const so = restCenter(chip);
 
     const pull = run(chip, [
-      { transform: poseAt(so, dock.x, dock.y, dock.s) },
-      { transform: poseAt(so, dock.x, hover, dock.s) },
+      { transform: poseAt(so, dock.x, dock.y, dock.s, 90) },
+      { transform: poseAt(so, dock.approach, dock.y, dock.s, 90) },
     ], { duration: REDUCED_MOTION ? 1 : TIMING.seat, easing: EASE.out });
     await pull.finished.catch(() => {});
-    land(chip, pull, poseAt(so, dock.x, hover, dock.s));
+    land(chip, pull, poseAt(so, dock.approach, dock.y, dock.s, 90));
 
     seatEl.classList.remove('is-in');
-    const o = reparent(chip, flightEl, dock.x, hover, dock.s);
+    const o = reparent(chip, flightEl, dock.approach, dock.y, dock.s, 90);
     railEl.classList.remove('is-gone');
 
     const home = railHome();
     const back = run(chip, [
-      { transform: poseAt(o, dock.x, hover, dock.s) },
-      { transform: poseAt(o, dock.x, hover - cardH * dock.s * 0.10, dock.s),
+      { transform: poseAt(o, dock.approach, dock.y, dock.s, 90) },
+      { transform: poseAt(o, dock.approach + dock.total * 0.08, dock.y, dock.s, 72),
         offset: 0.24, easing: PLUCK_EASE },
       { transform: poseAt(o, home.x, home.y, 1) },
     ], { duration: REDUCED_MOTION ? 1 : TIMING.flight, easing: EASE.out });
@@ -566,6 +554,7 @@ import { getInteractions } from './src/interactions/index.js';
     // 선반이 다시 이 칩의 자리를 맡는다. 만든 차례 그대로 끼워 넣어야
     // 좌우 대칭인 이웃의 겹침 순서가 바뀌지 않는다.
     railEl.insertBefore(chip, chips[focus + 1] || null);
+    chip.classList.remove('is-active');
     chip.setAttribute('role', 'option');
     chip.removeAttribute('aria-hidden');
     away = -1;
@@ -642,16 +631,16 @@ import { getInteractions } from './src/interactions/index.js';
   stageEl.addEventListener('pointerdown', (e) => {
     if (state !== 'shelf') return;
     stageEl.setPointerCapture(e.pointerId);
-    rail.drag = { x: e.clientX, from: rail.pos, moved: 0 };
+    rail.drag = { y: e.clientY, from: rail.pos, moved: 0 };
     stageEl.classList.add('is-dragging');
   });
 
   stageEl.addEventListener('pointermove', (e) => {
     const d = rail.drag;
     if (!d) return;
-    const dx = e.clientX - d.x;
-    d.moved = Math.max(d.moved, Math.abs(dx));
-    rail.pos = clamp(d.from - dx / stepPx(), 0, LAST);
+    const dy = e.clientY - d.y;
+    d.moved = Math.max(d.moved, Math.abs(dy));
+    rail.pos = clamp(d.from - dy / stepPx(), 0, LAST);
   });
 
   function endDrag(e) {
@@ -694,8 +683,11 @@ import { getInteractions } from './src/interactions/index.js';
     if (state === 'inserting') { skipSequence(); return; }
     if (e.key === 'Escape') { requestEject(); return; }
     if (state !== 'shelf') return;
-    if (e.key === 'ArrowRight') { goto(Math.round(rail.target) + 1); e.preventDefault(); }
-    else if (e.key === 'ArrowLeft') { goto(Math.round(rail.target) - 1); e.preventDefault(); }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      goto(Math.round(rail.target) + 1); e.preventDefault();
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      goto(Math.round(rail.target) - 1); e.preventDefault();
+    }
     else if (e.key === 'Enter' || e.key === ' ') { insert(); e.preventDefault(); }
   });
 
@@ -733,7 +725,7 @@ import { getInteractions } from './src/interactions/index.js';
     if (away >= 0 && chips[away].parentElement === seatEl) {
       const chip = chips[away];
       const d = dockPose();
-      chip.style.transform = poseAt(restCenter(chip), d.x, d.y, d.s);
+      chip.style.transform = poseAt(restCenter(chip), d.x, d.y, d.s, 90);
     }
     if (state === 'play') {
       zoomPose = zoomTransform();
@@ -754,7 +746,7 @@ import { getInteractions } from './src/interactions/index.js';
     if (!REDUCED_MOTION) {
       chips.forEach((chip, i) => {
         chip.animate([
-          { opacity: 0, transform: chip.style.transform + ' translateY(14px)' },
+          { opacity: 0, transform: chip.style.transform + ' translateX(16px)' },
           { opacity: 1, transform: chip.style.transform },
         ], { duration: 520, delay: 60 + Math.abs(i - focus) * 45, easing: EASE.out, fill: 'backwards' });
       });

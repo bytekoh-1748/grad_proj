@@ -56,8 +56,8 @@ export const FAN = Object.freeze({
   gapNear: 0.98,
   gapFar: 0.34,
   yaw: 22,
-  base: 0.86,
-  peak: 3,
-  dim: 0.5,
-  shade: 0.1,
+  base: 0.95,
+  peak: 2.6,
+  dim: 0.45,
+  shade: 0.06,
 });

@@ -12,11 +12,11 @@
  * ================================================================ */
 
 :root {
-  --ink: #121212;             /* 판 위의 글 — 거의 검정 */
-  --ground: #ECF0F3;          /* 레퍼런스의 차가운 밝은 회색 */
-  --ground-hi: #FFFFFF;
-  --ground-shadow: #D1D9E6;
-  --card-paper: #FBFCFD;      /* 모든 카트리지 안쪽에 쓰는 하나의 흰색 */
+  --ink: #171717;
+  --line: #282828;
+  --ground: #F6F3EC;
+  --surface: #FBF9F4;
+  --card-paper: #FFFFFF;
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 
@@ -24,22 +24,17 @@
   --serif: 'Instrument Serif', 'Pretendard Variable', Georgia, serif;
 
   /* 칩 한 장의 크기 — 모든 칩이 같다 */
-  --card-w: clamp(210px, min(23vw, 38vh), 340px);
+  --card-w: clamp(320px, min(36.3vw, 56vh), 580px);
 
   /* 카드 겉선 — 오른쪽 위로 내민 귀의 폭. 카드 폭에 대한 비다.
      몸통은 그만큼 좁으므로 슬롯도 같은 값으로 옮겨 앉힌다.
      겉선 자체는 src/cartridge-shape.js 가 잰다 — 여기 값과 같아야 한다. */
   --ear: 0.06;
 
-  /* 도크 — 카드보다 한 단계 뒤로 물러난 크기로, 위쪽 윤곽만 남긴다.
-     0.477 은 본체 폭에 대한 아래 잠김의 비다. */
-  --deck-w: clamp(440px, min(48vw, 108vh), 820px);
-  --deck-sink: calc(var(--deck-w) * 0.477);
+  /* 왼쪽의 본체와 옆면 포트에 들어갈 카트리지의 짧은 변 */
+  --deck-w: clamp(820px, min(82vw, 150vh), 1240px);
   --cart-w: calc(var(--deck-w) * 0.22);
   --cart-h: calc(var(--cart-w) / 0.76);
-  /* 슬롯이 삼키는 아랫단. 잔줄과 무늬까지만 남기고 그 아래를 문다 —
-     제목·판식·서명은 기계 안으로 들어간다. 0.381 이 무늬가 끝나는 자리다. */
-  --cart-lip: calc(var(--cart-h) * 0.5);
 }
 
 * { box-sizing: border-box; }
@@ -82,162 +77,135 @@ body {
 .stage.is-dragging { cursor: grabbing; }
 
 /* ---- 칩 ----------------------------------------------------------
-   같은 크기의 카드가 부채처럼 겹친다. 자리는 script 가 잡는다. */
+   오른쪽에서 파일 폴더처럼 세로로 포개진다. 자리는 script 가 잡는다. */
 
 .rail {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 37%;
+  left: 74.5%;
+  top: 47.5%;
+  width: 0;
   height: 0;
-  perspective: 1100px;
-  perspective-origin: 50% 50%;
-  transform-style: preserve-3d;
   outline: none;
-  transition: opacity 220ms ease, transform 340ms var(--ease-out);
+  transition: opacity 180ms ease, transform 260ms var(--ease-out);
 }
-.rail.is-gone { opacity: 0; transform: translateY(16px); pointer-events: none; }
+.rail.is-gone { opacity: 0; transform: translateX(18px); pointer-events: none; }
 
 .chip {
+  --tab-space: calc(var(--w) * 0.085);
   position: absolute;
-  left: 50%;
+  left: 0;
   top: 0;
   width: var(--w);
   height: var(--h);
   margin-left: calc(var(--w) / -2);
   margin-top: calc(var(--h) / -2);
   transform-origin: 50% 50%;
-  transform-style: preserve-3d;
   backface-visibility: hidden;
-  /* 흰 후광은 억제하고 아래로 떨어지는 그림자로 높이를 만든다. */
-  filter:
-    drop-shadow(-8px -8px 18px rgba(255,255,255,0.42))
-    drop-shadow(10px 14px 20px rgba(166,179,198,0.62));
   will-change: transform;
 }
 
-/* 앞면과 같은 실루엣을 Z축 뒤에 얇게 둔다. 옆으로 밀지 않으므로
-   좌우 카드의 rotateY가 어느 측면이 보일지를 자연스럽게 결정한다. */
-.chip::before,
+/* 인덱스 탭 — 카드마다 위치를 달리해 서류철의 층을 읽히게 한다. */
+.chip::before {
+  content: attr(data-tab);
+  position: absolute;
+  z-index: 0;
+  left: var(--tab-x, 10%);
+  top: 0;
+  display: grid;
+  place-items: start center;
+  width: 42%;
+  height: var(--tab-space);
+  padding-top: calc(var(--w) * 0.018);
+  clip-path: polygon(0 100%, 10% 28%, 19% 0, 81% 0, 90% 28%, 100% 100%);
+  background: var(--body);
+  color: #fff;
+  font-size: calc(var(--w) * 0.035);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  pointer-events: none;
+}
+
+/* 종이가 여러 장 겹친 듯한 한 줄의 뒷면. 입체 그림자는 쓰지 않는다. */
 .chip::after {
   content: '';
   position: absolute;
-  inset: 0;
-  clip-path: url(#cartridge-shape);
-  pointer-events: none;
-  transform-origin: 50% 50%;
-  backface-visibility: hidden;
-}
-
-.chip::before {
-  z-index: -2;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--body) 78%, #111827),
-    color-mix(in srgb, var(--body) 58%, #111827)
-  );
-  transform: translate3d(0, 1px, var(--depth-z, -8px));
-  box-shadow:
-    inset 2px 2px 2px rgba(255,255,255,0.16),
-    inset -3px -3px 5px rgba(15,23,42,0.22);
-}
-
-.chip::after {
   z-index: -1;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--body) 92%, white),
-    color-mix(in srgb, var(--body) 74%, #111827)
-  );
-  transform: translate3d(0, 0.5px, var(--depth-mid-z, -4px));
-}
-
-.chip > .face {
-  z-index: 1;
+  left: 4px;
+  right: -4px;
+  top: calc(var(--tab-space) + 2px);
+  bottom: -4px;
+  border: 1px solid color-mix(in srgb, var(--body) 72%, var(--ink));
+  border-radius: 5px 5px 3px 3px;
+  background: var(--surface);
+  pointer-events: none;
 }
 
 .chip.is-focus { cursor: pointer; }
 
-/* 겉선 한 벌 — 눈에 보이지 않지만 카드가 이것으로 잘린다 */
 .shape-defs {
   position: absolute;
   width: 0;
   height: 0;
 }
 
-/* 카드 한 장 — 색 껍데기가 흰 판 한 장을 두른다.
-   겉선은 카트리지의 실루엣이다. 오른쪽 위로 귀가 한 칸 나오고 그 아래
-   몸통이 한 단 들어서며, 두 군데 빗변은 45도로 떨어지고 모서리는
-   둥글게 말린다. 그 자리는 src/cartridge-shape.js 가 잰다. */
+/* 카드 앞면 — 기존 정보 구조는 유지하되, 면과 음영 대신 선과 여백으로 만든다. */
 .face {
-  --bw: calc(var(--w) * 0.07);               /* 껍데기의 두께 */
-  --ear-w: calc(var(--w) * var(--ear));      /* 귀가 내민 폭 */
+  --bw: calc(var(--w) * 0.045);
   position: relative;
+  z-index: 1;
+  top: var(--tab-space);
   display: flex;
   width: 100%;
-  height: 100%;
-  /* 여백은 오직 카드 폭으로만 잰다. %로 두면 부모 상자를 기준으로
-     풀려서, 같은 카드가 선반·허공·슬롯에서 서로 다르게 조판된다. */
-  padding: var(--bw) calc(var(--bw) + var(--ear-w)) var(--bw) var(--bw);
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--body) 90%, white),
-    color-mix(in srgb, var(--body) 92%, black)
-  );
+  height: calc(100% - var(--tab-space));
+  padding: var(--bw);
+  border: 1.25px solid var(--line);
+  border-radius: 5px 5px 3px 3px;
+  background: var(--body);
   overflow: hidden;
   backface-visibility: hidden;
-  transition: transform 160ms var(--ease-out);
-  clip-path: url(#cartridge-shape);
-  box-shadow:
-    inset -2px -2px 4px rgba(0,0,0,0.1),
-    inset 1px 1px 2px rgba(255,255,255,0.2);
+  transition: transform 150ms var(--ease-out);
 }
 
-/* 껍데기 위로 한 단 솟은 흰 패널. 카드마다 달랐던 종이색은 하나로
-   통일하고, 바깥 그림자와 얇은 안쪽 베벨을 함께 써서 높이를 드러낸다. */
 .face-inner {
   position: relative;
   display: flex;
   flex: 1;
   min-width: 0;
   flex-direction: column;
-  padding: calc(var(--w) * 0.058) calc(var(--w) * 0.058) calc(var(--w) * 0.05);
-  border-radius: calc(var(--w) * 0.058);
-  background: linear-gradient(145deg, #FFFFFF 0%, var(--card-paper) 50%, #F1F4F7 100%);
+  padding: calc(var(--w) * 0.052) calc(var(--w) * 0.054) calc(var(--w) * 0.045);
+  border: 1px solid color-mix(in srgb, var(--body) 55%, var(--line));
+  border-radius: 2px;
+  background: var(--card-paper);
   color: var(--ink);
   font-size: calc(var(--w) * 0.0475);
   overflow: hidden;
-  box-shadow:
-    0 3px 4px rgba(153,167,186,0.28),
-    0 9px 16px rgba(153,167,186,0.42),
-    inset 1px 1px 0 rgba(255,255,255,0.55),
-    inset -1px -1px 2px rgba(176,187,202,0.34);
 }
 .face-inner::before {
   content: '';
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow:
-    inset 0 0 0 1px rgba(255,255,255,0.28),
-    inset 0 0 0 2px rgba(145,160,180,0.08);
+  inset: 4px;
+  border: 1px solid color-mix(in srgb, var(--body) 20%, transparent);
   pointer-events: none;
 }
 
-/* 판 위쪽의 잔줄 — 껍데기의 색을 한 줄 끌어들인다 */
+.face-inner > * {
+  transition: opacity 120ms ease;
+}
+.chip:not(.is-focus):not(.is-active) .face-inner > * {
+  opacity: 0;
+}
+
 .face-grip {
   display: flex;
   gap: 0.32em;
-  height: 0.5em;
-  margin-bottom: 1.15em;
+  height: 0.44em;
+  margin-bottom: 1.05em;
   color: var(--body);
-  opacity: 0.6;
+  opacity: 0.72;
 }
 .face-grip i {
   flex: 1;
-  background: currentColor;
-  border-radius: 0.5px;
-  box-shadow: 1px 1.5px 2px rgba(126,143,166,0.3);
+  border: 0.7px solid currentColor;
 }
 
 .face-art {
@@ -245,18 +213,16 @@ body {
   width: 100%;
   height: auto;
   aspect-ratio: 2.34 / 1;
-  filter: drop-shadow(1.5px 2px 1.5px rgba(126,143,166,0.24));
 }
 
 .face-title {
   margin: auto 0 0;
   font-family: var(--serif);
-  font-size: 1.92em;
+  font-size: 1.86em;
   font-weight: 400;
   line-height: 1.02;
   letter-spacing: 0.004em;
   white-space: nowrap;
-  text-shadow: 0 1px 1px rgba(126,143,166,0.14);
 }
 .face-title span { display: block; opacity: 0.62; }
 
@@ -264,12 +230,11 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  margin-top: 1.15em;
+  margin-top: 1.05em;
   font-size: 0.62em;
   font-weight: 700;
   letter-spacing: 0.09em;
   line-height: 1.55;
-  text-shadow: 0 1px 1px rgba(126,143,166,0.14);
 }
 .face-meta b { display: block; font-weight: 700; opacity: 0.42; }
 .face-meta em { font-style: normal; font-variant-numeric: tabular-nums; }
@@ -278,52 +243,46 @@ body {
 .face-sign {
   display: block;
   width: 74%;
-  margin-top: 0.5em;
+  margin-top: 0.45em;
   fill: none;
   stroke: currentColor;
   stroke-width: 2.1;
   stroke-linecap: round;
   stroke-linejoin: round;
   opacity: 0.92;
-  filter: drop-shadow(1px 1px 1px rgba(126,143,166,0.18));
 }
 .face-rule {
   height: 1px;
-  margin-top: 0.25em;
+  margin-top: 0.2em;
   background: currentColor;
-  opacity: 0.32;
-  box-shadow: 0 1px 1px rgba(126,143,166,0.22);
+  opacity: 0.36;
 }
 
-/* 초점에서 멀어질수록 어둑해진다 — 밝기 대신 검은 막의 투명도로 */
 .face-shade {
   position: absolute;
   inset: 0;
-  background: #08080A;
+  background: #fff;
   opacity: 0;
   pointer-events: none;
 }
 
 /* ---- 도크 -----------------------------------------------------------
-   기계의 윤곽은 검은 선보다 넓은 음영으로 읽힌다. 바탕색과 가까운
-   표면을 들어 올리고, 화면과 슬롯만 안쪽으로 눌러 깊이를 나눈다.
-
-   판은 아래에서 반쯤 올라와 있다. 화면의 허리가 곧 화면의 끝이다. */
+   왼쪽에 놓인 기술 도면형 게임기. 모든 깊이는 그림자가 아니라 겹선,
+   절개선, 나사와 포트 구조로 표현한다. */
 
 .deck {
   position: absolute;
-  left: 50%;
-  bottom: calc(var(--deck-sink) * -1);
+  left: calc(36vw - var(--deck-w));
+  top: 49%;
   width: var(--deck-w);
-  margin-left: calc(var(--deck-w) / -2);
+  transform: translateY(-50%);
 }
 
-/* 슬롯 자리 — 크기가 없는 점 하나다. 칩이 제 중심을 이 점에 맞춰 앉고,
-   .console 이 그 위에 얹히므로 점 아래로 내려간 만큼만 기계가 삼킨다. */
+/* 카트리지는 본체보다 한 층 뒤에서 오른쪽 옆면으로 들어간다. */
 .seat {
   position: absolute;
-  left: 50%;
-  top: 0;
+  right: 0;
+  top: 50%;
   z-index: 1;
   width: 0;
   height: 0;
@@ -332,49 +291,123 @@ body {
 }
 .seat.is-in { opacity: 1; }
 
-/* 1.4 는 고른 테에서 나온 값이다 — 3:2 화면에 폭의 7% 씩을 사방으로
-   두르면 판의 세로가 저절로 이만큼이 된다. */
 .console {
   position: relative;
   z-index: 2;
   width: 100%;
-  aspect-ratio: 1.4;
-  border-radius: 2.6% / 3.6%;
-  background: var(--ground);
-  box-shadow:
-    18px 18px 30px var(--ground-shadow),
-    -18px -18px 30px var(--ground-hi),
-    inset 0 0 0 1px rgba(111,126,147,0.05);
+  aspect-ratio: 1.22;
+  border: 1.4px solid var(--line);
+  border-radius: 24px 30px 20px 18px;
+  background: var(--surface);
   will-change: transform;
 }
 
-/* 칩이 들어가는 입 — 위가 트인 네모 하나가 곧 열린 입이다 */
-.slot {
+.console-inset {
   position: absolute;
-  left: 50%;
-  top: 0;
-  width: calc(var(--cart-w) * (1 - var(--ear)) + 1.6%);
-  height: 2.4%;
-  margin-left: calc(
-    (var(--cart-w) * (1 - var(--ear)) + 1.6%) / -2
-    - var(--cart-w) * var(--ear) / 2
-  );
-  border: 1px solid rgba(111,126,147,0.08);
-  border-top: 0;
-  border-radius: 0 0 2px 2px;
-  background: var(--ground);
-  box-shadow:
-    inset 2px 3px 5px rgba(177,189,205,0.82),
-    inset -2px -2px 5px rgba(255,255,255,0.8);
+  inset: 10px;
+  border: 1px solid color-mix(in srgb, var(--line) 62%, transparent);
+  border-radius: 17px 23px 14px 12px;
+  pointer-events: none;
 }
 
-/* 화면이 앉는 자리 — 재는 일만 한다. 눈에 보이는 것은 없다.
-   9.8% 는 세로로 잰 폭의 7% 다. */
+.screw {
+  position: absolute;
+  z-index: 5;
+  width: 11px;
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+}
+.screw::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 50%;
+  border-top: 1px solid var(--line);
+  transform: rotate(-18deg);
+}
+.screw-nw { left: 20px; top: 20px; }
+.screw-ne { right: 20px; top: 20px; }
+.screw-sw { left: 20px; bottom: 20px; }
+.screw-se { right: 20px; bottom: 20px; }
+
+.console-mark {
+  position: absolute;
+  left: 7%;
+  top: 6.2%;
+  display: flex;
+  align-items: baseline;
+  gap: 1em;
+  white-space: nowrap;
+}
+.console-mark strong {
+  font-size: clamp(10px, 1vw, 15px);
+  letter-spacing: 0.12em;
+}
+.console-mark span {
+  font-size: clamp(5px, 0.48vw, 8px);
+  letter-spacing: 0.14em;
+  opacity: 0.62;
+}
+
+/* 포트 안쪽의 두 평행선이 서랍 레일처럼 본체 안으로 이어진다. */
+.port-guide {
+  position: absolute;
+  z-index: 3;
+  right: 0;
+  top: 36.5%;
+  width: 29%;
+  height: 32%;
+  border: 1px solid var(--line);
+  border-right: 0;
+  background:
+    linear-gradient(var(--line), var(--line)) 12% 24% / 72% 1px no-repeat,
+    linear-gradient(var(--line), var(--line)) 12% 76% / 72% 1px no-repeat,
+    var(--surface);
+}
+.port-guide::before,
+.port-guide::after {
+  content: '';
+  position: absolute;
+  right: 8%;
+  width: 14%;
+  height: 17%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.port-guide::before { top: 13%; }
+.port-guide::after { bottom: 13%; }
+
+.slot {
+  position: absolute;
+  z-index: 6;
+  right: -3px;
+  top: calc(52.7% - (var(--cart-w) + 6px) / 2);
+  width: 7px;
+  height: calc(var(--cart-w) + 6px);
+  border: 1px solid var(--line);
+  border-right-width: 2px;
+  background: var(--surface);
+}
+
 .bezel {
   position: absolute;
   left: 7%;
-  top: 9.8%;
-  width: 86%;
+  top: 15.5%;
+  width: 56.5%;
+  padding: 2.2%;
+  border: 1.2px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+}
+.bezel::before {
+  content: 'DISPLAY / 240 × 160';
+  position: absolute;
+  left: 0;
+  top: calc(100% + 7px);
+  font-size: clamp(5px, 0.45vw, 7px);
+  letter-spacing: 0.12em;
 }
 
 .lcd {
@@ -382,12 +415,11 @@ body {
   width: 100%;
   aspect-ratio: 3 / 2;
   overflow: hidden;
-  background: var(--ground);
-  box-shadow:
-    inset 18px 18px 30px var(--ground-shadow),
-    inset -18px -18px 30px var(--ground-hi),
-    inset 0 0 0 1px rgba(111,126,147,0.05);
-  transition: background-color 180ms ease, box-shadow 180ms ease;
+  border: 1.2px solid var(--line);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 8px, rgba(23,23,23,0.07) 8px 9px),
+    #EDEAE2;
+  transition: background-color 180ms ease;
 }
 .lcd canvas {
   display: block;
@@ -397,16 +429,9 @@ body {
   opacity: 0;
   transition: opacity 180ms ease;
 }
-
-/* 대기 중인 화면은 면이 아니라 빈 윤곽이다. 카트리지가 꽂힌 짧은
-   기동 구간에만 실제 화면이 켜지고, 이어지는 확대의 기준이 된다. */
-.lcd.is-on {
-  background: #141613;
-  box-shadow: none;
-}
+.lcd.is-on { background: #141613; }
 .lcd.is-on canvas { opacity: 1; }
 
-/* 화소 사이의 실금 — 이것이 화면을 화면으로 읽히게 한다 */
 .lcd-grid {
   position: absolute;
   inset: 0;
@@ -419,21 +444,66 @@ body {
 }
 .lcd.is-on .lcd-grid { opacity: 0.14; }
 
-/* 불 — 위 테의 왼쪽 끝. 아래는 화면 밖으로 나가므로 여기에 둔다.
-   꺼져 있을 때는 빈 동그라미, 켜지면 속이 찬다. */
+.controls {
+  position: absolute;
+  left: 8%;
+  bottom: 8%;
+  display: flex;
+  align-items: center;
+  gap: clamp(18px, 2.2vw, 34px);
+}
+.dpad {
+  position: relative;
+  width: clamp(34px, 4vw, 58px);
+  aspect-ratio: 1;
+}
+.dpad i {
+  position: absolute;
+  border: 1.2px solid var(--line);
+  background: var(--surface);
+}
+.dpad i:first-child { left: 36%; top: 0; width: 28%; height: 100%; }
+.dpad i:last-child { left: 0; top: 36%; width: 100%; height: 28%; }
+.control-key {
+  display: grid;
+  place-items: center;
+  width: clamp(25px, 3.2vw, 44px);
+  aspect-ratio: 1;
+  border: 1.2px solid var(--line);
+  border-radius: 50%;
+  font-size: clamp(7px, 0.7vw, 11px);
+}
+.key-b { transform: translateY(9px); }
+
+.vent {
+  position: absolute;
+  right: 7%;
+  bottom: 8%;
+  display: flex;
+  gap: clamp(5px, 0.55vw, 9px);
+  height: 13%;
+  transform: skewX(-13deg);
+}
+.vent i { width: 1px; height: 100%; background: var(--line); }
+
+.port-label {
+  position: absolute;
+  right: 4.5%;
+  top: 64.5%;
+  font-size: clamp(5px, 0.48vw, 8px);
+  letter-spacing: 0.12em;
+}
+
 .led {
   position: absolute;
-  left: 7%;
-  top: 4.27%;
-  width: 0.9%;
+  left: 69%;
+  top: 17.5%;
+  width: clamp(7px, 0.7vw, 10px);
   aspect-ratio: 1;
+  border: 1px solid var(--line);
   border-radius: 50%;
-  background: var(--ground);
-  box-shadow:
-    inset 1px 1px 2px rgba(156,170,189,0.42),
-    inset -1px -1px 2px rgba(255,255,255,0.44),
-    1px 1px 2px rgba(156,170,189,0.2);
-  transition: background-color 260ms ease;
+  background: transparent;
+  transition: background-color 180ms ease;
 }
 .led.is-on { background: var(--ink); }
 
@@ -519,11 +589,13 @@ body {
 
 @media (max-width: 720px) {
   :root {
-    --card-w: clamp(120px, 42vw, 200px);
-    --deck-w: clamp(280px, 88vw, 560px);
-    --deck-sink: calc(var(--deck-w) * 0.42);
+    --card-w: clamp(190px, 58vw, 250px);
+    --deck-w: clamp(320px, 94vw, 480px);
   }
-  .rail { top: 37%; }
+  .deck { left: 3vw; top: 28%; }
+  .rail { left: 70%; top: 69%; }
+  .console-mark span,
+  .bezel::before { display: none; }
 }
 
 /* 자 — clamp() 는 계산된 문자열로만 읽히므로 실제 길이를 재서 쓴다.
@@ -536,14 +608,14 @@ body {
   height: 1px;
   pointer-events: none;
 }
-.probe-cart { width: var(--cart-w); height: var(--cart-lip); }
+.probe-cart { width: var(--cart-w); height: 1px; }
 
 /* ---- 손에 닿는 느낌 ------------------------------------------------
    칩의 자리는 script 가 매 프레임 .chip 에 쓴다. 그래서 눌림과 들림은
    안쪽 .face 에 얹는다 — 서로 덮어쓰지 않는다. */
 
 @media (hover: hover) and (pointer: fine) {
-  .chip.is-focus:hover .face { transform: translateY(-5px); }
+  .chip.is-focus:hover .face { transform: translateX(-6px); }
 }
 .chip.is-focus:active .face { transform: scale(0.97); }
 
