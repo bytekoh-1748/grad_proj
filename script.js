@@ -89,6 +89,7 @@ import { getInteractions } from './src/interactions/index.js';
     chip.className = 'chip';
     chip.dataset.i = String(i);
     chip.setAttribute('role', 'option');
+    chip.style.setProperty('--body', interaction.cartridge.body);
     chip.appendChild(createCartridgeFace(interaction, 200));
     railEl.appendChild(chip);
     chip._shade = chip.querySelector('.face-shade');
@@ -142,7 +143,10 @@ import { getInteractions } from './src/interactions/index.js';
       // 오른쪽 면은 왼쪽(중앙)을 보고 중앙으로 들어올 때만 정면으로 펴진다.
       const turn = Math.min(1, a);
       const ry = -Math.sign(d) * FAN.yaw * turn;
+      const depth = cardW * 0.025;
       const chip = chips[i];
+      chip.style.setProperty('--depth-z', (-depth).toFixed(2) + 'px');
+      chip.style.setProperty('--depth-mid-z', (-depth * 0.5).toFixed(2) + 'px');
       chip.style.transform =
         'translate3d(' + x.toFixed(2) + 'px,0,0) ' +
         'rotateY(' + ry.toFixed(2) + 'deg) scale(' + sc.toFixed(4) + ')';
@@ -235,7 +239,7 @@ import { getInteractions } from './src/interactions/index.js';
       lcdG.font = '700 ' + (LCD_H * 0.055).toFixed(1) + 'px ' + FACE_FONT;
       lcdG.globalAlpha = b > 0.72 ? 1 : 0;
       lcdG.fillText(
-        'ADVANCE  ·  NO. ' + interaction.number,
+        'DOCK  ·  NO. ' + interaction.number,
         LCD_W / 2,
         y + LCD_H * 0.13,
       );
@@ -393,11 +397,28 @@ import { getInteractions } from './src/interactions/index.js';
   }
 
   let zoomPose = '';
+  let interactionHistoryActive = false;
+  let historyReturnPending = false;
+  let returnAfterInsert = false;
+
+  /* 인터랙션은 별도 페이지처럼 느껴지지만 실제 URL은 그대로다. 같은 URL의
+     히스토리 항목을 한 칸 쌓아 브라우저 뒤로가기를 홈 복귀에 사용한다. */
+  function pushInteractionHistory() {
+    if (interactionHistoryActive) return;
+    try {
+      history.pushState({ craftBoyInteraction: true }, '', location.href);
+      interactionHistoryActive = true;
+    } catch (error) {
+      interactionHistoryActive = false;
+    }
+  }
 
   async function insert() {
     if (state !== 'shelf') return;
     state = 'inserting';
     seq.skip = false;
+    returnAfterInsert = false;
+    pushInteractionHistory();
 
     const i = clamp(Math.round(rail.target), 0, interactions.length - 1);
     if (i !== focus) setNow(i);
@@ -456,6 +477,7 @@ import { getInteractions } from './src/interactions/index.js';
 
     // 불이 든다
     ledEl.classList.add('is-on');
+    lcdEl.classList.add('is-on');
     lcd.power = 1;
     lcd.contrast = 1;
     lcd.boot = performance.now();
@@ -484,6 +506,12 @@ import { getInteractions } from './src/interactions/index.js';
     roomEl.classList.add('is-inside');
     ptr.dx = 0; ptr.dy = 0; ptr.vx = 0; ptr.vy = 0;
     state = 'play';
+
+    // 삽입 애니메이션 중 뒤로가기를 눌렀다면 도착하자마자 홈으로 돌아간다.
+    if (returnAfterInsert) {
+      returnAfterInsert = false;
+      eject();
+    }
   }
 
   async function eject() {
@@ -547,10 +575,37 @@ import { getInteractions } from './src/interactions/index.js';
     back.cancel();
 
     ledEl.classList.remove('is-on');
+    lcdEl.classList.remove('is-on');
     lcd.power = 0;
     lcd.contrast = 0.17;
     state = 'shelf';
   }
+
+  /* 닫기 버튼과 Escape도 브라우저 뒤로가기와 같은 히스토리 한 칸을
+     소비한다. 그래야 닫힌 뒤에 인터랙션용 항목이 남지 않는다. */
+  function requestEject() {
+    if (state !== 'play') return;
+    if (interactionHistoryActive) {
+      if (historyReturnPending) return;
+      historyReturnPending = true;
+      history.back();
+      return;
+    }
+    eject();
+  }
+
+  addEventListener('popstate', () => {
+    if (!interactionHistoryActive) return;
+    interactionHistoryActive = false;
+    historyReturnPending = false;
+
+    if (state === 'inserting') {
+      returnAfterInsert = true;
+      skipSequence();
+      return;
+    }
+    if (state === 'play') eject();
+  });
 
   /* ==================================================================
    * 한 판 — 그리기
@@ -637,7 +692,7 @@ import { getInteractions } from './src/interactions/index.js';
 
   addEventListener('keydown', (e) => {
     if (state === 'inserting') { skipSequence(); return; }
-    if (e.key === 'Escape') { eject(); return; }
+    if (e.key === 'Escape') { requestEject(); return; }
     if (state !== 'shelf') return;
     if (e.key === 'ArrowRight') { goto(Math.round(rail.target) + 1); e.preventDefault(); }
     else if (e.key === 'ArrowLeft') { goto(Math.round(rail.target) - 1); e.preventDefault(); }
@@ -647,7 +702,7 @@ import { getInteractions } from './src/interactions/index.js';
   // 삽입 중에 화면을 누르면 끝으로 건너뛴다 — 기다리게 두지 않는다
   addEventListener('pointerdown', () => { if (state === 'inserting') skipSequence(); }, true);
 
-  ejectEl.addEventListener('click', eject);
+  ejectEl.addEventListener('click', requestEject);
 
   playCv.addEventListener('pointerdown', (e) => {
     playCv.setPointerCapture(e.pointerId);

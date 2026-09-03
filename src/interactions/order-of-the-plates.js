@@ -7,7 +7,7 @@ registerInteraction({
   title: 'Order of the Plates',
   mode: 'CHROMATIC + BLACK',
   hint: 'MOVE TO CHANGE WHICH PLATE LANDS FIRST',
-  cartridge: { body: INK.mintGreen, foreground: INK.warmCharcoal },
+  cartridge: { body: INK.mintGreen, foreground: PAPER.gray },
   screen: { ink: INK.warmCharcoal, paper: PAPER.gray },
   previewTime: 7700,
   render({ context, width, height, time, color, pointer }) {

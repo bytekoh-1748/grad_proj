@@ -1,4 +1,8 @@
 import { IDLE_POINTER } from './config.js';
+import { installCartridgeClip } from './cartridge-shape.js';
+
+// 카드를 자르는 겉선 한 벌. 모든 카드가 같은 것을 쓴다.
+installCartridgeClip();
 
 const SIGNATURE_PATH = 'M3 27 C 9 9, 15 5, 17 15 C 19 25, 13 30, 12 23 C 11 15, 21 9, 30 19 '
   + 'C 36 25, 41 23, 45 13 C 48 5, 53 7, 51 17 C 49 27, 43 30, 45 21 '
@@ -12,21 +16,24 @@ export function createCartridgeFace(interaction, width) {
   face.className = 'face';
   face.style.setProperty('--w', `${width}px`);
   face.style.setProperty('--h', `${width / 0.76}px`);
+  // body 는 겉껍데기, foreground 는 그 안에 얹히는 종이다.
   face.style.setProperty('--body', interaction.cartridge.body);
-  face.style.setProperty('--fg', interaction.cartridge.foreground);
+  face.style.setProperty('--face-paper', interaction.cartridge.foreground);
 
   face.innerHTML = `
-    <span class="face-grip">${'<i></i>'.repeat(14)}</span>
-    <canvas class="face-art"></canvas>
-    <h3 class="face-title"><span>Interaction</span>${interaction.title}</h3>
-    <div class="face-meta">
-      <span><b>MODE</b><em>${interaction.mode}</em></span>
-      <span><b>CART</b><em>NO. ${interaction.number}</em></span>
+    <div class="face-inner">
+      <span class="face-grip">${'<i></i>'.repeat(14)}</span>
+      <canvas class="face-art"></canvas>
+      <h3 class="face-title"><span>Interaction</span>${interaction.title}</h3>
+      <div class="face-meta">
+        <span><b>MODE</b><em>${interaction.mode}</em></span>
+        <span><b>CART</b><em>NO. ${interaction.number}</em></span>
+      </div>
+      <svg class="face-sign" viewBox="0 0 100 34" preserveAspectRatio="xMinYMid meet" aria-hidden="true">
+        <path d="${SIGNATURE_PATH}" />
+      </svg>
+      <span class="face-rule"></span>
     </div>
-    <svg class="face-sign" viewBox="0 0 100 34" preserveAspectRatio="xMinYMid meet" aria-hidden="true">
-      <path d="${SIGNATURE_PATH}" />
-    </svg>
-    <span class="face-rule"></span>
     <span class="face-shade"></span>
   `;
 
@@ -73,7 +80,7 @@ export function paintCartridgeArt(canvas, interaction) {
   const cellWidth = width / columns;
   const cellHeight = height / rows;
   const squareSize = Math.min(cellWidth, cellHeight) * 0.76;
-  context.fillStyle = interaction.cartridge.foreground;
+  context.fillStyle = interaction.cartridge.body;
 
   for (let row = 0; row < rows; row += 1) {
     for (let column = 0; column < columns; column += 1) {

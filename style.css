@@ -12,8 +12,11 @@
  * ================================================================ */
 
 :root {
-  --paper: #FAFAF7;
-  --ground: #0E0E10;          /* 방 바닥 — 거의 검정 */
+  --ink: #121212;             /* 판 위의 글 — 거의 검정 */
+  --ground: #ECF0F3;          /* 레퍼런스의 차가운 밝은 회색 */
+  --ground-hi: #FFFFFF;
+  --ground-shadow: #D1D9E6;
+  --card-paper: #FBFCFD;      /* 모든 카트리지 안쪽에 쓰는 하나의 흰색 */
 
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 
@@ -21,15 +24,22 @@
   --serif: 'Instrument Serif', 'Pretendard Variable', Georgia, serif;
 
   /* 칩 한 장의 크기 — 모든 칩이 같다 */
-  --card-w: clamp(170px, min(23vw, 40vh), 340px);
+  --card-w: clamp(210px, min(23vw, 38vh), 340px);
 
-  /* 게임기 — 가로로 누운 몸통. 아래를 잘라 먹으며 화면만 크게 남는다 */
-  --deck-w: clamp(340px, min(62vw, 130vh), 1320px);
-  --cart-w: calc(var(--deck-w) * 0.24);
+  /* 카드 겉선 — 오른쪽 위로 내민 귀의 폭. 카드 폭에 대한 비다.
+     몸통은 그만큼 좁으므로 슬롯도 같은 값으로 옮겨 앉힌다.
+     겉선 자체는 src/cartridge-shape.js 가 잰다 — 여기 값과 같아야 한다. */
+  --ear: 0.06;
+
+  /* 도크 — 카드보다 한 단계 뒤로 물러난 크기로, 위쪽 윤곽만 남긴다.
+     0.477 은 본체 폭에 대한 아래 잠김의 비다. */
+  --deck-w: clamp(440px, min(48vw, 108vh), 820px);
+  --deck-sink: calc(var(--deck-w) * 0.477);
+  --cart-w: calc(var(--deck-w) * 0.22);
   --cart-h: calc(var(--cart-w) / 0.76);
   /* 슬롯이 삼키는 아랫단. 잔줄과 무늬까지만 남기고 그 아래를 문다 —
-     제목·판식·서명은 기계 안으로 들어간다. 0.406 은 무늬가 끝나는 자리다. */
-  --cart-lip: calc(var(--cart-h) * 0.565);
+     제목·판식·서명은 기계 안으로 들어간다. 0.381 이 무늬가 끝나는 자리다. */
+  --cart-lip: calc(var(--cart-h) * 0.5);
 }
 
 * { box-sizing: border-box; }
@@ -40,21 +50,19 @@ body {
   overflow: hidden;
   overscroll-behavior: none;
   background: var(--ground);
-  color: var(--paper);
+  color: var(--ink);
   font-family: var(--mono);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* 바닥에 깔린 옅은 빛 — 게임기가 놓인 자리 */
+/* 바탕 — 별도의 패널 없이 오브젝트가 기본 배경 위에 직접 떠 있다. */
 .room {
   position: fixed;
   inset: 0;
   overflow: hidden;
-  background:
-    radial-gradient(120% 70% at 50% 84%, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0) 62%),
-    radial-gradient(90% 60% at 50% 22%, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 70%);
+  background: var(--ground);
   transition: opacity 200ms ease;
 }
 
@@ -64,6 +72,7 @@ body {
 
 .stage {
   position: absolute;
+  z-index: 1;
   inset: 0;
   transform-origin: 50% 50%;
   cursor: grab;
@@ -79,7 +88,7 @@ body {
   position: absolute;
   left: 0;
   right: 0;
-  top: 36.3%;
+  top: 37%;
   height: 0;
   perspective: 1100px;
   perspective-origin: 50% 50%;
@@ -100,47 +109,135 @@ body {
   transform-origin: 50% 50%;
   transform-style: preserve-3d;
   backface-visibility: hidden;
+  /* 흰 후광은 억제하고 아래로 떨어지는 그림자로 높이를 만든다. */
+  filter:
+    drop-shadow(-8px -8px 18px rgba(255,255,255,0.42))
+    drop-shadow(10px 14px 20px rgba(166,179,198,0.62));
   will-change: transform;
+}
+
+/* 앞면과 같은 실루엣을 Z축 뒤에 얇게 둔다. 옆으로 밀지 않으므로
+   좌우 카드의 rotateY가 어느 측면이 보일지를 자연스럽게 결정한다. */
+.chip::before,
+.chip::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  clip-path: url(#cartridge-shape);
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  backface-visibility: hidden;
+}
+
+.chip::before {
+  z-index: -2;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--body) 78%, #111827),
+    color-mix(in srgb, var(--body) 58%, #111827)
+  );
+  transform: translate3d(0, 1px, var(--depth-z, -8px));
+  box-shadow:
+    inset 2px 2px 2px rgba(255,255,255,0.16),
+    inset -3px -3px 5px rgba(15,23,42,0.22);
+}
+
+.chip::after {
+  z-index: -1;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--body) 92%, white),
+    color-mix(in srgb, var(--body) 74%, #111827)
+  );
+  transform: translate3d(0, 0.5px, var(--depth-mid-z, -4px));
+}
+
+.chip > .face {
+  z-index: 1;
 }
 
 .chip.is-focus { cursor: pointer; }
 
-/* 카드 한 장 — 도서관 대출증의 짜임을 게임 칩으로 옮긴다 */
+/* 겉선 한 벌 — 눈에 보이지 않지만 카드가 이것으로 잘린다 */
+.shape-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* 카드 한 장 — 색 껍데기가 흰 판 한 장을 두른다.
+   겉선은 카트리지의 실루엣이다. 오른쪽 위로 귀가 한 칸 나오고 그 아래
+   몸통이 한 단 들어서며, 두 군데 빗변은 45도로 떨어지고 모서리는
+   둥글게 말린다. 그 자리는 src/cartridge-shape.js 가 잰다. */
 .face {
-  --r: calc(var(--w) * 0.062);
+  --bw: calc(var(--w) * 0.07);               /* 껍데기의 두께 */
+  --ear-w: calc(var(--w) * var(--ear));      /* 귀가 내민 폭 */
   position: relative;
+  display: flex;
   width: 100%;
   height: 100%;
   /* 여백은 오직 카드 폭으로만 잰다. %로 두면 부모 상자를 기준으로
      풀려서, 같은 카드가 선반·허공·슬롯에서 서로 다르게 조판된다. */
-  padding: calc(var(--w) * 0.075) calc(var(--w) * 0.075) calc(var(--w) * 0.065);
-  display: flex;
-  flex-direction: column;
-  border-radius: var(--r);
-  background: var(--body);
-  color: var(--fg);
-  font-size: calc(var(--w) * 0.058);
+  padding: var(--bw) calc(var(--bw) + var(--ear-w)) var(--bw) var(--bw);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--body) 90%, white),
+    color-mix(in srgb, var(--body) 92%, black)
+  );
   overflow: hidden;
   backface-visibility: hidden;
   transition: transform 160ms var(--ease-out);
+  clip-path: url(#cartridge-shape);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.16),
-    inset 0 0 0 1px rgba(0,0,0,0.06),
-    0 22px 34px -20px rgba(0,0,0,0.92);
+    inset -2px -2px 4px rgba(0,0,0,0.1),
+    inset 1px 1px 2px rgba(255,255,255,0.2);
 }
 
-/* 칩 위쪽의 잔줄 — 손에 쥐는 자리 */
+/* 껍데기 위로 한 단 솟은 흰 패널. 카드마다 달랐던 종이색은 하나로
+   통일하고, 바깥 그림자와 얇은 안쪽 베벨을 함께 써서 높이를 드러낸다. */
+.face-inner {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  padding: calc(var(--w) * 0.058) calc(var(--w) * 0.058) calc(var(--w) * 0.05);
+  border-radius: calc(var(--w) * 0.058);
+  background: linear-gradient(145deg, #FFFFFF 0%, var(--card-paper) 50%, #F1F4F7 100%);
+  color: var(--ink);
+  font-size: calc(var(--w) * 0.0475);
+  overflow: hidden;
+  box-shadow:
+    0 3px 4px rgba(153,167,186,0.28),
+    0 9px 16px rgba(153,167,186,0.42),
+    inset 1px 1px 0 rgba(255,255,255,0.55),
+    inset -1px -1px 2px rgba(176,187,202,0.34);
+}
+.face-inner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.28),
+    inset 0 0 0 2px rgba(145,160,180,0.08);
+  pointer-events: none;
+}
+
+/* 판 위쪽의 잔줄 — 껍데기의 색을 한 줄 끌어들인다 */
 .face-grip {
   display: flex;
   gap: 0.32em;
   height: 0.5em;
   margin-bottom: 1.15em;
-  opacity: 0.42;
+  color: var(--body);
+  opacity: 0.6;
 }
 .face-grip i {
   flex: 1;
   background: currentColor;
   border-radius: 0.5px;
+  box-shadow: 1px 1.5px 2px rgba(126,143,166,0.3);
 }
 
 .face-art {
@@ -148,6 +245,7 @@ body {
   width: 100%;
   height: auto;
   aspect-ratio: 2.34 / 1;
+  filter: drop-shadow(1.5px 2px 1.5px rgba(126,143,166,0.24));
 }
 
 .face-title {
@@ -158,6 +256,7 @@ body {
   line-height: 1.02;
   letter-spacing: 0.004em;
   white-space: nowrap;
+  text-shadow: 0 1px 1px rgba(126,143,166,0.14);
 }
 .face-title span { display: block; opacity: 0.62; }
 
@@ -170,8 +269,9 @@ body {
   font-weight: 700;
   letter-spacing: 0.09em;
   line-height: 1.55;
+  text-shadow: 0 1px 1px rgba(126,143,166,0.14);
 }
-.face-meta b { display: block; font-weight: 700; opacity: 0.5; }
+.face-meta b { display: block; font-weight: 700; opacity: 0.42; }
 .face-meta em { font-style: normal; font-variant-numeric: tabular-nums; }
 .face-meta > span:last-child { text-align: right; }
 
@@ -180,53 +280,43 @@ body {
   width: 74%;
   margin-top: 0.5em;
   fill: none;
-  stroke: #0F0F10;
+  stroke: currentColor;
   stroke-width: 2.1;
   stroke-linecap: round;
   stroke-linejoin: round;
   opacity: 0.92;
+  filter: drop-shadow(1px 1px 1px rgba(126,143,166,0.18));
 }
 .face-rule {
   height: 1px;
   margin-top: 0.25em;
   background: currentColor;
-  opacity: 0.55;
+  opacity: 0.32;
+  box-shadow: 0 1px 1px rgba(126,143,166,0.22);
 }
 
 /* 초점에서 멀어질수록 어둑해진다 — 밝기 대신 검은 막의 투명도로 */
 .face-shade {
   position: absolute;
   inset: 0;
-  border-radius: var(--r);
   background: #08080A;
   opacity: 0;
   pointer-events: none;
 }
 
-/* ---- 게임기 — Advance -----------------------------------------------
-   가로로 누운 몸통이 화면 아래로 걸쳐 있다. 아래쪽 조작부는 잘려 나가고
-   눈에 남는 것은 카트리지와 화면이다. */
+/* ---- 도크 -----------------------------------------------------------
+   기계의 윤곽은 검은 선보다 넓은 음영으로 읽힌다. 바탕색과 가까운
+   표면을 들어 올리고, 화면과 슬롯만 안쪽으로 눌러 깊이를 나눈다.
+
+   판은 아래에서 반쯤 올라와 있다. 화면의 허리가 곧 화면의 끝이다. */
 
 .deck {
   position: absolute;
   left: 50%;
-  top: 80%;
+  bottom: calc(var(--deck-sink) * -1);
   width: var(--deck-w);
   margin-left: calc(var(--deck-w) / -2);
 }
-
-/* 위 모서리로 얼굴을 내미는 L·R 어깨 단추 */
-.bump {
-  position: absolute;
-  top: -3.5%;
-  height: 8%;
-  width: 15%;
-  border-radius: 30% 30% 0 0 / 60% 60% 0 0;
-  background: linear-gradient(#C9C7C0, #A9A69D);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
-}
-.bump-l { left: 6.5%; }
-.bump-r { right: 6.5%; }
 
 /* 슬롯 자리 — 크기가 없는 점 하나다. 칩이 제 중심을 이 점에 맞춰 앉고,
    .console 이 그 위에 얹히므로 점 아래로 내려간 만큼만 기계가 삼킨다. */
@@ -242,63 +332,49 @@ body {
 }
 .seat.is-in { opacity: 1; }
 
+/* 1.4 는 고른 테에서 나온 값이다 — 3:2 화면에 폭의 7% 씩을 사방으로
+   두르면 판의 세로가 저절로 이만큼이 된다. */
 .console {
   position: relative;
   z-index: 2;
   width: 100%;
-  aspect-ratio: 1.76;
-  border-radius: 17% / 30%;
-  background:
-    radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 55%),
-    linear-gradient(168deg, #E2E0D8 0%, #CFCCC3 34%, #BAB7AE 68%, #A5A29A 100%);
+  aspect-ratio: 1.4;
+  border-radius: 2.6% / 3.6%;
+  background: var(--ground);
   box-shadow:
-    inset 0 2px 0 rgba(255,255,255,0.75),
-    inset 0 -4px 10px rgba(0,0,0,0.16),
-    0 50px 90px -34px rgba(0,0,0,0.9),
-    0 2px 0 rgba(0,0,0,0.35);
+    18px 18px 30px var(--ground-shadow),
+    -18px -18px 30px var(--ground-hi),
+    inset 0 0 0 1px rgba(111,126,147,0.05);
   will-change: transform;
 }
 
-/* 칩이 들어가는 입 */
+/* 칩이 들어가는 입 — 위가 트인 네모 하나가 곧 열린 입이다 */
 .slot {
   position: absolute;
   left: 50%;
-  top: -1px;
-  width: calc(var(--cart-w) + 2.2%);
-  height: 2.6%;
-  margin-left: calc((var(--cart-w) + 2.2%) / -2);
-  border-radius: 0 0 4px 4px;
-  background: linear-gradient(#0B0B0C, #2B2B2C);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 -1px 0 rgba(255,255,255,0.14);
+  top: 0;
+  width: calc(var(--cart-w) * (1 - var(--ear)) + 1.6%);
+  height: 2.4%;
+  margin-left: calc(
+    (var(--cart-w) * (1 - var(--ear)) + 1.6%) / -2
+    - var(--cart-w) * var(--ear) / 2
+  );
+  border: 1px solid rgba(111,126,147,0.08);
+  border-top: 0;
+  border-radius: 0 0 2px 2px;
+  background: var(--ground);
+  box-shadow:
+    inset 2px 3px 5px rgba(177,189,205,0.82),
+    inset -2px -2px 5px rgba(255,255,255,0.8);
 }
 
+/* 화면이 앉는 자리 — 재는 일만 한다. 눈에 보이는 것은 없다.
+   9.8% 는 세로로 잰 폭의 7% 다. */
 .bezel {
   position: absolute;
-  left: 22%;
-  top: 11%;
-  width: 56%;
-  padding: 2.6%;
-  border-radius: 2.4% / 4.2%;
-  background: linear-gradient(168deg, #3E4147 0%, #292B30 46%, #1B1D20 100%);
-  box-shadow:
-    inset 0 2px 5px rgba(0,0,0,0.55),
-    0 1px 0 rgba(255,255,255,0.5);
-}
-
-.led {
-  position: absolute;
-  left: 18.2%;
-  top: 12.5%;
-  width: 1.2%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: #2F4032;
-  box-shadow: inset 0 0 2px rgba(0,0,0,0.6);
-  transition: background-color 260ms ease, box-shadow 260ms ease;
-}
-.led.is-on {
-  background: #4BE06B;
-  box-shadow: 0 0 9px rgba(75,224,107,0.9), inset 0 0 2px rgba(255,255,255,0.6);
+  left: 7%;
+  top: 9.8%;
+  width: 86%;
 }
 
 .lcd {
@@ -306,155 +382,60 @@ body {
   width: 100%;
   aspect-ratio: 3 / 2;
   overflow: hidden;
-  background: #121410;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.6);
+  background: var(--ground);
+  box-shadow:
+    inset 18px 18px 30px var(--ground-shadow),
+    inset -18px -18px 30px var(--ground-hi),
+    inset 0 0 0 1px rgba(111,126,147,0.05);
+  transition: background-color 180ms ease, box-shadow 180ms ease;
 }
 .lcd canvas {
   display: block;
   width: 100%;
   height: 100%;
   image-rendering: pixelated;
+  opacity: 0;
+  transition: opacity 180ms ease;
 }
 
-/* 화소 사이의 실금 */
+/* 대기 중인 화면은 면이 아니라 빈 윤곽이다. 카트리지가 꽂힌 짧은
+   기동 구간에만 실제 화면이 켜지고, 이어지는 확대의 기준이 된다. */
+.lcd.is-on {
+  background: #141613;
+  box-shadow: none;
+}
+.lcd.is-on canvas { opacity: 1; }
+
+/* 화소 사이의 실금 — 이것이 화면을 화면으로 읽히게 한다 */
 .lcd-grid {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.18;
+  opacity: 0;
+  transition: opacity 180ms ease;
   background-image:
     repeating-linear-gradient(90deg, rgba(0,0,0,0.6) 0 1px, transparent 1px calc(100% / 60)),
     repeating-linear-gradient(0deg, rgba(0,0,0,0.6) 0 1px, transparent 1px calc(100% / 40));
 }
-.lcd-glare {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(152deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.03) 26%, rgba(255,255,255,0) 48%);
-}
+.lcd.is-on .lcd-grid { opacity: 0.14; }
 
-/* ---- 조작부 — 화면 양옆 ---------------------------------------- */
-
-.dpad {
+/* 불 — 위 테의 왼쪽 끝. 아래는 화면 밖으로 나가므로 여기에 둔다.
+   꺼져 있을 때는 빈 동그라미, 켜지면 속이 찬다. */
+.led {
   position: absolute;
-  left: 3.5%;
-  top: 22%;
-  width: 14%;
-  aspect-ratio: 1;
-}
-.dpad i {
-  position: absolute;
-  background: linear-gradient(160deg, #3B3C41, #212226);
-  border-radius: 3px;
-  box-shadow: 0 1.5px 0 rgba(255,255,255,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
-}
-.dpad-v { left: 34%; top: 0; width: 32%; height: 100%; }
-.dpad-h { left: 0; top: 34%; width: 100%; height: 32%; }
-.dpad-dot {
-  left: 40%; top: 40%; width: 20%; height: 20%;
-  border-radius: 50%;
-  background: rgba(0,0,0,0.45) !important;
-  box-shadow: none !important;
-}
-
-.ab {
-  position: absolute;
-  right: 2.5%;
-  top: 24%;
-  display: flex;
-  gap: 9%;
-  width: 18%;
-  transform: rotate(-22deg);
-}
-.btn {
-  position: relative;
-  flex: 1;
+  left: 7%;
+  top: 4.27%;
+  width: 0.9%;
   aspect-ratio: 1;
   border-radius: 50%;
-  background: linear-gradient(160deg, #6E6F78, #4A4B53);
-  box-shadow: 0 2px 0 rgba(255,255,255,0.42), inset 0 1px 1px rgba(255,255,255,0.22);
+  background: var(--ground);
+  box-shadow:
+    inset 1px 1px 2px rgba(156,170,189,0.42),
+    inset -1px -1px 2px rgba(255,255,255,0.44),
+    1px 1px 2px rgba(156,170,189,0.2);
+  transition: background-color 260ms ease;
 }
-.btn i {
-  position: absolute;
-  left: 50%;
-  top: 112%;
-  transform: translateX(-50%);
-  font-size: clamp(4px, 0.62vw, 8px);
-  font-style: normal;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: #5B5C63;
-}
-
-.soft {
-  position: absolute;
-  right: 4%;
-  top: 40%;
-  display: flex;
-  gap: 10%;
-  width: 15%;
-  transform: rotate(-22deg);
-}
-.pill {
-  position: relative;
-  flex: 1;
-  height: clamp(5px, 0.85vw, 11px);
-  border-radius: 99px;
-  background: linear-gradient(160deg, #74757C, #4E4F56);
-  box-shadow: 0 1.5px 0 rgba(255,255,255,0.42);
-}
-.pill i {
-  position: absolute;
-  left: 50%;
-  top: 145%;
-  transform: translateX(-50%);
-  font-size: clamp(3.4px, 0.5vw, 6.5px);
-  font-style: normal;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: #5B5C63;
-  white-space: nowrap;
-}
-
-.mark {
-  position: absolute;
-  left: 10.5%;
-  top: 5.2%;
-  display: flex;
-  align-items: baseline;
-  gap: 0.4em;
-  margin: 0;
-  color: #55565C;
-}
-.mark span {
-  font-size: clamp(6px, 0.86vw, 13px);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-}
-.mark em {
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: clamp(9px, 1.24vw, 19px);
-  letter-spacing: 0.01em;
-  color: #6B4C86;
-}
-
-.speaker {
-  position: absolute;
-  right: 4%;
-  top: 47%;
-  display: flex;
-  gap: 22%;
-  width: 8%;
-  height: 4.5%;
-  transform: rotate(-22deg);
-}
-.speaker i {
-  flex: 1;
-  border-radius: 99px;
-  background: rgba(0,0,0,0.24);
-  box-shadow: 0 1px 0 rgba(255,255,255,0.45);
-}
+.led.is-on { background: var(--ink); }
 
 /* ---- 날아가는 칩 -------------------------------------------------- */
 
@@ -538,11 +519,11 @@ body {
 
 @media (max-width: 720px) {
   :root {
-    --card-w: clamp(140px, 50vw, 240px);
-    --deck-w: clamp(300px, 94vw, 580px);
+    --card-w: clamp(120px, 42vw, 200px);
+    --deck-w: clamp(280px, 88vw, 560px);
+    --deck-sink: calc(var(--deck-w) * 0.42);
   }
-  .rail { top: 34%; }
-  .deck { top: 78%; }
+  .rail { top: 37%; }
 }
 
 /* 자 — clamp() 는 계산된 문자열로만 읽히므로 실제 길이를 재서 쓴다.
