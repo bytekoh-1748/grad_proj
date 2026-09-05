@@ -1,258 +1,588 @@
 import {
   clamp,
   EASE,
-  FACE_FONT,
-  FAN,
   IDLE_POINTER,
   lerp,
-  PLUCK_EASE,
+  POP,
   REDUCED_MOTION,
+  RPM,
   TIMING,
 } from './src/config.js';
-import { createCartridgeFace, paintCartridgeArt } from './src/cartridge-face.js';
-import { getInteractions } from './src/interactions/index.js';
+import { buildRecord } from './src/record-art.js';
+import { DECK, deckArm, deckBase } from './src/turntable.js';
+import { getTracks } from './src/tracks/index.js';
 
 (() => {
   'use strict';
 
   /* ==================================================================
-   * CRAFT BOY — 인터랙션 카트리지
+   * HOT WAX — 팝아트 턴테이블
    *
-   *   1. 선반  같은 크기의 칩이 부채처럼 겹쳐 선다. 끌어서 넘긴다.
-   *   2. 삽입  고른 칩이 날아가 게임기 위 홈으로 내려앉는다.
-   *   3. 기동  화면에 불이 들어오고 마크가 내려온다.
-   *   4. 확대  화면 안으로 밀고 들어가면 인터랙션이 시작된다.
+   *   1. 상자   판이 오른쪽에서 대각선으로 겹쳐 선다. 굴려서 넘긴다.
+   *   2. 큐     고른 판이 활을 그리며 무대 한가운데로 들어오고,
+   *             그 박자에 맞춰 제목과 아티스트가 비스듬히 밀려 들어온다.
+   *   3. 재생   판이 플래터로 옮겨 앉고 톤암이 안쪽으로 들어온다.
+   *   4. 넘김   바늘이 앉고 5초 뒤 무대가 사라지고 곡의 화면이 올라온다.
+   *   5. 정지   톤암이 바깥으로 나가고 판은 왔던 자리로 돌아간다.
    *
-   * 움직임의 기준은 emilkowalski/skills 를 따른다. transform 과 opacity
-   * 만 움직이고, 자주 하는 동작(넘기기)은 짧게, 드물게 보는 장면(삽입·
-   * 확대)만 길게 간다. 도중에 아무 키나 누르면 끝으로 건너뛴다.
+   * 움직이는 것은 transform 과 opacity 뿐이다. 자주 하는 동작(넘기기)은
+   * 짧게, 드물게 보는 장면(큐·도킹)만 길게 간다.
    * ================================================================ */
 
-  const interactions = getInteractions();
-  if (!interactions.length) throw new Error('No interactions have been registered.');
+  const tracks = getTracks();
+  if (!tracks.length) throw new Error('No tracks have been registered.');
 
-  /* 인터랙션의 메타데이터와 render()는 src/interactions에 독립 등록된다. */
-
-  /* ==================================================================
+  /* ------------------------------------------------------------------
    * 자리
-   * ================================================================ */
+   * ---------------------------------------------------------------- */
 
   const roomEl = document.getElementById('room');
-  const stageEl = document.getElementById('stage');
-  const railEl = document.getElementById('rail');
-  const seatEl = document.getElementById('seat');
-  const consoleEl = document.getElementById('console');
-  const ledEl = document.getElementById('led');
-  const lcdEl = document.getElementById('lcd');
-  const lcdCv = document.getElementById('lcd-cv');
-  const flightEl = document.getElementById('flight');
-  const playEl = document.getElementById('play');
-  const playCv = document.getElementById('play-cv');
-  const playTitleEl = document.getElementById('play-title');
-  const playHintEl = document.getElementById('play-hint');
-  const ejectEl = document.getElementById('eject');
+  const deckBaseEl = document.getElementById('deck-base');
+  const deckArmEl = document.getElementById('deck-arm');
+  const recordsEl = document.getElementById('records');
+  const billboardEl = document.getElementById('billboard');
+  const transportEl = document.getElementById('transport');
+  const cueEl = document.getElementById('cue');
 
-  const LCD_W = 240, LCD_H = 160;      // 어드밴스의 도트 판
-  lcdCv.width = LCD_W;
-  lcdCv.height = LCD_H;
-  const lcdG = lcdCv.getContext('2d');
+  const spotAnchor = document.getElementById('anchor-spot');
+  const headAnchor = document.getElementById('anchor-crate-head');
+  const tailAnchor = document.getElementById('anchor-crate-tail');
 
-  const lcdBuf = document.createElement('canvas');
-  lcdBuf.width = LCD_W;
-  lcdBuf.height = LCD_H;
-  const bufG = lcdBuf.getContext('2d');
+  const visualEl = document.getElementById('visual');
+  const visualCv = document.getElementById('visual-cv');
+  const visualG = visualCv.getContext('2d');
+  const liftEl = document.getElementById('lift');
 
-  const playG = playCv.getContext('2d');
+  const bb = {
+    side: billboardEl.querySelector('.bb-side [data-slide]'),
+    title: billboardEl.querySelector('.bb-title [data-slide]'),
+    artist: billboardEl.querySelector('.bb-artist [data-slide]'),
+    meta: billboardEl.querySelector('.bb-meta [data-slide]'),
+  };
 
-  /* ==================================================================
-   * 선반 — 부채처럼 겹친 칩
-   * ================================================================ */
+  const vh = {
+    side: document.getElementById('vh-side'),
+    title: document.getElementById('vh-title'),
+    artist: document.getElementById('vh-artist'),
+    hint: document.getElementById('vh-hint'),
+    bpm: document.getElementById('vh-bpm'),
+    needle: document.getElementById('vh-needle'),
+  };
 
-  /* 파일 스택에서 바로 옆 칩까지의 세로 거리 — 끌 때의 한 칸이기도 하다. */
-  const stepPx = () => cardH * 0.1144 || cardW;
+  /* innerHTML 로 갈아 끼우면 마크업에 심어 둔 자리표까지 지워진다.
+     그림만 앞에 끼워 넣고 자리표는 그대로 둔다. */
+  deckBaseEl.insertAdjacentHTML('afterbegin', deckBase());
+  deckArmEl.innerHTML = deckArm();
+  const platterMark = deckBaseEl.querySelector('#platter-mark');
 
-  /* 초점만 한 뼘 앞으로 나온다. 나머지는 서로 같은 크기다. */
-  function scaleOf(d) {
-    return FAN.base + (1 - FAN.base) * Math.exp(-FAN.peak * Math.abs(d));
-  }
+  /* ------------------------------------------------------------------
+   * 판 — 한 장이 상자·무대·플래터를 그대로 건너간다
+   * ---------------------------------------------------------------- */
 
-  const INITIAL = Math.min(1, interactions.length - 1);
-  const chips = [];
-  const rail = { pos: INITIAL, target: INITIAL, drag: null, wheel: 0, wheelAt: 0 };
-  let focus = INITIAL;
-  let cardW = 0, cardH = 0;
-  let away = -1;           // 지금 선반을 떠나 있는 칩. layoutRail 이 손대지 않는다
-  let state = 'shelf';     // shelf | inserting | play | ejecting
-
-  interactions.forEach((interaction, i) => {
-    const chip = document.createElement('div');
-    chip.className = 'chip';
-    chip.dataset.i = String(i);
-    chip.dataset.tab = 'NO. ' + interaction.number;
-    chip.setAttribute('role', 'option');
-    chip.style.setProperty('--body', interaction.cartridge.body);
-    chip.style.setProperty('--tab-x', [6, 31, 50, 14, 42, 24][i % 6] + '%');
-    chip.appendChild(createCartridgeFace(interaction, 200));
-    railEl.appendChild(chip);
-    chip._shade = chip.querySelector('.face-shade');
-    chip._art = chip.querySelector('.face-art');
-    chips.push(chip);
+  const cards = tracks.map((track, i) => {
+    const card = buildRecord(track);
+    card.dataset.i = String(i);
+    card.setAttribute('role', 'option');
+    card.setAttribute('aria-label', `${track.title} — ${track.artist}`);
+    recordsEl.appendChild(card);
+    card._spin = card.querySelector('.record-spin');
+    return card;
   });
 
-  const probe = document.createElement('div');
-  probe.className = 'probe';
-  document.body.appendChild(probe);
+  const CRATE_SCALE = 1;
+  const SPOT_SCALE = 1.2;
 
-  const cartProbe = document.createElement('div');
-  cartProbe.className = 'probe probe-cart';
-  document.body.appendChild(cartProbe);
+  /* ------------------------------------------------------------------
+   * 잰 값 — 레이아웃은 CSS 가 정하고 여기서는 재기만 한다
+   * ---------------------------------------------------------------- */
 
-  function readSizes() {
-    cardW = probe.getBoundingClientRect().width || 160;
-    cardH = cardW / 0.76;
-    chips.forEach((chip) => {
-      chip.style.setProperty('--w', cardW + 'px');
-      chip.style.setProperty('--h', cardH + 'px');
-      chip.firstChild.style.setProperty('--w', cardW + 'px');
-      chip.firstChild.style.setProperty('--h', cardH + 'px');
-    });
+  const geo = {
+    D: 200,
+    spot: { x: 0, y: 0 },
+    head: { x: 0, y: 0 },
+    axis: { x: 0, y: 1 },
+    perp: { x: -1, y: 0 },
+    step: 100,
+    platter: { x: 0, y: 0, scale: 1 },
+  };
+
+  const centerOf = (el) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  };
+
+  function measure() {
+    geo.D = cards[0].offsetWidth || 200;
+    geo.spot = centerOf(spotAnchor);
+    geo.head = centerOf(headAnchor);
+
+    const tail = centerOf(tailAnchor);
+    const dx = tail.x - geo.head.x;
+    const dy = tail.y - geo.head.y;
+    const len = Math.hypot(dx, dy) || 1;
+    geo.axis = { x: dx / len, y: dy / len };
+    geo.perp = { x: -geo.axis.y, y: geo.axis.x };   // 상자에서 무대 쪽을 가리킨다
+    geo.step = len / 6.2;      // 판끼리 절반쯤 겹친다
+
+    /* 자리는 크기 없는 점에서, 크기는 데크의 레이아웃 너비에서 잰다.
+       판의 검은 원은 200짜리 상자 안에서 지름 198을 차지한다. */
+    const mark = centerOf(platterMark);
+    const deckPx = deckBaseEl.offsetWidth || 1;
+    const discPx = (DECK.platter.r * 2) * (deckPx / DECK.width);
+    geo.platter = { x: mark.x, y: mark.y, scale: discPx / 0.99 / geo.D };
   }
 
-  function repaintArt() {
-    chips.forEach((chip, i) => paintCartridgeArt(chip._art, interactions[i]));
+  /* ------------------------------------------------------------------
+   * 상자 — 대각선 위에 놓인 자리들
+   * ---------------------------------------------------------------- */
+
+  const FOCUS_SLOT = 1.9;          // 초점이 서는 자리 (머리에서 몇 칸 아래)
+  const crate = { pos: 0, target: 0, drag: null, wheel: 0, wheelAt: 0 };
+  const gap = { value: 0, target: 0 };   // 판이 빠져나간 자리를 닫는 정도
+
+  let focus = 0;
+  let out = -1;                    // 지금 상자를 떠나 있는 판
+  let state = 'idle';              // idle | cueing | cued | docking | playing | paused | screen | returning
+  let gen = 0;                     // 지나간 순서를 무효로 만드는 표
+
+  function slotOf(i, closed = gap.value) {
+    return i - (out >= 0 && i > out ? closed : 0);
   }
 
-  function layoutRail() {
-    // 선택 카드를 오른쪽 고정축에 두고 위아래의 카드를 파일처럼 포갠다.
-    for (let i = 0; i < chips.length; i++) {
-      if (i === away) continue;      // 지금 기계 쪽에 가 있는 칩
-      const d = i - rail.pos;
-      const a = Math.abs(d);
-      const x = Math.min(3, a) * cardW * 0.018;
-      const y = d * stepPx();
-      const sc = scaleOf(d);
-      const chip = chips[i];
-      chip.style.transform =
-        'translate3d(' + x.toFixed(2) + 'px,' + y.toFixed(2) + 'px,0) ' +
-        'scale(' + sc.toFixed(4) + ')';
-      chip.style.zIndex = String(a < 0.5 ? 200 : 100 - Math.round(a * 10));
-      chip.classList.toggle('is-focus', a < 0.5);
-      chip._shade.style.opacity =
-        (FAN.shade * (1 - Math.exp(-FAN.dim * a))).toFixed(3);
+  function cratePlace(i, pos = crate.pos, closed = gap.value) {
+    const d = slotOf(i, closed) - slotOf(pos, closed);
+    const near = Math.abs(d);
+    const along = (d + FOCUS_SLOT) * geo.step;
+    const pop = Math.exp(-near * near * 1.5) * geo.D * 0.2;
+    return {
+      x: geo.head.x + geo.axis.x * along + geo.perp.x * pop,
+      y: geo.head.y + geo.axis.y * along + geo.perp.y * pop,
+      s: CRATE_SCALE * (1 + 0.05 * Math.exp(-near * near * 1.5)),
+      near,
+    };
+  }
+
+  const spotPlace = () => ({ x: geo.spot.x, y: geo.spot.y, s: SPOT_SCALE });
+  const platterPlace = () => ({ x: geo.platter.x, y: geo.platter.y, s: geo.platter.scale });
+
+  function poseAt(x, y, s) {
+    return `translate3d(${(x - geo.D / 2).toFixed(2)}px, ${(y - geo.D / 2).toFixed(2)}px, 0) `
+      + `scale(${s.toFixed(4)})`;
+  }
+
+  const flying = new Set();     // 지금 활을 그리며 옮겨 가는 중인 판
+
+  function layoutCrate() {
+    for (let i = 0; i < cards.length; i += 1) {
+      if (i === out || flying.has(i)) continue;
+      const place = cratePlace(i);
+      const card = cards[i];
+      card.style.transform = poseAt(place.x, place.y, place.s);
+      card.style.zIndex = String(100 + i);
+      card.style.opacity = place.near > 3.4 ? String(clamp(4.4 - place.near, 0, 1)) : '1';
+      card.classList.toggle('is-focus', place.near < 0.5);
+      card.classList.add('is-pickable');
     }
   }
 
-  function stepRail(dt) {
-    if (rail.drag) return;
-    const gap = rail.target - rail.pos;
-    if (Math.abs(gap) < 0.0009) {
-      rail.pos = rail.target;
-      return;
-    }
-    // 180ms 안에 목표의 99.9%에 닿는 단방향 감속. 오버슈트가 없다.
-    const snap = 1 - Math.pow(0.001, Math.min(dt, 48) / 180);
-    rail.pos += gap * snap;
+  function stepCrate(dt) {
+    const ease = (from, to) => {
+      const delta = to - from;
+      if (Math.abs(delta) < 0.0009) return to;
+      return from + delta * (1 - Math.pow(0.001, Math.min(dt, 48) / TIMING.shuffle));
+    };
+    gap.value = ease(gap.value, gap.target);
+    if (crate.drag) return;
+    crate.pos = ease(crate.pos, crate.target);
   }
 
-  /* 지금 보고 있는 카트리지를 못박는다. */
-  function setNow(i) {
+  let followTimer = 0;
+
+  function syncFocus() {
+    const i = clamp(Math.round(crate.pos), 0, tracks.length - 1);
+    if (i === focus) return;
     focus = i;
-    chips.forEach((c, n) => c.setAttribute('aria-selected', n === i ? 'true' : 'false'));
+    cards.forEach((card, n) => card.setAttribute('aria-selected', n === i ? 'true' : 'false'));
+
+    /* 상자가 멎으면 무대 위의 판도 그 자리로 갈아탄다 */
+    if (state !== 'idle' && state !== 'cueing' && state !== 'cued') return;
+    clearTimeout(followTimer);
+    followTimer = setTimeout(() => {
+      if ((state === 'idle' || state === 'cued') && out !== focus) cue(focus);
+    }, 180);
   }
 
-  function syncNow() {
-    if (!Number.isFinite(rail.pos)) rail.pos = rail.target;
-    const i = clamp(Math.round(rail.pos), 0, interactions.length - 1);
-    if (i !== focus) setNow(i);
+  /* ------------------------------------------------------------------
+   * 톤암 — 각도 하나로만 말한다
+   * ---------------------------------------------------------------- */
+
+  const armEl = deckArmEl.querySelector('#tonearm');
+  let armDeg = DECK.arm.rest;
+
+  /* 지금 화면에 그려진 각도. 재생 중에는 톤암이 4분에 걸쳐 안쪽으로
+     기어들어 가므로, 멈출 때는 목표값이 아니라 이 값을 붙잡아야 한다. */
+  function liveArmDeg() {
+    const m = new DOMMatrixReadOnly(getComputedStyle(armEl).transform);
+    return (Math.atan2(m.b, m.a) * 180) / Math.PI;
   }
 
-  /* ==================================================================
-   * 화면 — 도트 매트릭스 한 판
-   * ================================================================ */
+  function setArm(deg, ms, easing = EASE.arm, lifted = false) {
+    armDeg = deg;
+    deckArmEl.style.setProperty('--arm-time', `${REDUCED_MOTION ? 1 : ms}ms`);
+    deckArmEl.style.setProperty('--arm-ease', easing);
+    deckArmEl.style.setProperty('--arm', `${deg.toFixed(2)}deg`);
+    deckArmEl.style.setProperty('--arm-scale', lifted ? '1.035' : '1');
+  }
 
-  const lcd = { power: 0, boot: -1, contrast: 0.17 };
+  /* ------------------------------------------------------------------
+   * 회전 — 33⅓ 까지 천천히 올라갔다 천천히 내려온다
+   * ---------------------------------------------------------------- */
 
-  function paintLcd(now) {
-    const interaction = interactions[focus];
-    const on = lcd.power > 0.5;
-    const ground = on ? interaction.screen.paper : '#151711';
-    const ink = on ? interaction.screen.ink : '#8CA173';
+  const FULL_RATE = (RPM * 360) / 60000;      // ms 당 각도
+  const spin = { deg: 0, rate: 0, target: 0 };
 
-    bufG.clearRect(0, 0, LCD_W, LCD_H);
-    bufG.save();
-    interaction.render({
-      context: bufG,
-      width: LCD_W,
-      height: LCD_H,
-      time: now,
-      color: ink,
-      pointer: IDLE_POINTER,
+  function stepSpin(dt) {
+    const k = 1 - Math.pow(0.001, Math.min(dt, 48) / TIMING.spinUp);
+    spin.rate = lerp(spin.rate, spin.target, k);
+    if (spin.rate < 0.0004 && spin.target === 0) spin.rate = 0;
+    if (!spin.rate) return;
+    spin.deg = (spin.deg + spin.rate * dt) % 360;
+    if (out >= 0) {
+      cards[out]._spin.setAttribute('transform', `rotate(${spin.deg.toFixed(2)} 100 100)`);
+    }
+  }
+
+  /* ------------------------------------------------------------------
+   * 날기 — 활을 그리며 자리를 옮긴다
+   * ---------------------------------------------------------------- */
+
+  const wait = (ms) => new Promise((resolve) => {
+    setTimeout(resolve, REDUCED_MOTION ? 0 : ms);
+  });
+
+  const inFlight = new WeakMap();
+
+  function flyTo(card, from, to, ms, easing, bow) {
+    inFlight.get(card)?.cancel();          // 앞선 비행은 여기서 끝난다
+    const mid = {
+      x: (from.x + to.x) / 2 + bow.x,
+      y: (from.y + to.y) / 2 + bow.y,
+      s: ((from.s + to.s) / 2) * 1.06,
+    };
+    const anim = card.animate(
+      [
+        { transform: poseAt(from.x, from.y, from.s) },
+        { transform: poseAt(mid.x, mid.y, mid.s), offset: 0.5 },
+        { transform: poseAt(to.x, to.y, to.s) },
+      ],
+      { duration: REDUCED_MOTION ? 1 : ms, easing, fill: 'forwards' },
+    );
+    inFlight.set(card, anim);
+
+    /* 도착했을 때만 자리를 못박는다. 도중에 끊긴 비행은 아무것도 쓰지 않는다 —
+       그래야 뒤이은 비행이 지금 위치에서 이어받는다. */
+    return anim.finished.then(() => {
+      card.style.transform = poseAt(to.x, to.y, to.s);
+      anim.cancel();
+      inFlight.delete(card);
+    }).catch(() => {});
+  }
+
+  /* ------------------------------------------------------------------
+   * 대각선 타이포
+   * ---------------------------------------------------------------- */
+
+  function showBillboard(track) {
+    billboardEl.classList.remove('is-on');
+    void billboardEl.offsetWidth;                 // 되감아 다시 밀어 넣는다
+    bb.side.textContent = `SIDE ${track.side}`;
+    bb.title.textContent = track.title;
+    bb.artist.textContent = track.artist;
+    bb.meta.textContent = `${track.genre} · ${track.duration} · ${track.bpm} BPM`;
+    billboardEl.classList.add('is-on');
+  }
+
+  const hideBillboard = () => billboardEl.classList.remove('is-on');
+
+  function say(text, muted = false) {
+    cueEl.textContent = text;
+    cueEl.classList.toggle('is-hidden', muted);
+  }
+
+  /* ------------------------------------------------------------------
+   * 트랜스포트
+   * ---------------------------------------------------------------- */
+
+  const keys = {};
+  transportEl.querySelectorAll('.tkey').forEach((key) => {
+    keys[key.dataset.act] = key;
+  });
+
+  function syncTransport() {
+    const playing = state === 'playing' || state === 'screen';
+    const cued = state === 'cued' || state === 'paused';
+    keys.play.disabled = playing || state === 'cueing' || state === 'docking';
+    keys.pause.disabled = !playing;
+    keys.stop.disabled = !(playing || cued);
+    keys.play.classList.toggle('is-live', playing);
+    keys.pause.classList.toggle('is-live', state === 'paused');
+  }
+
+  function hit(key) {
+    key.classList.add('is-hit');
+    setTimeout(() => key.classList.remove('is-hit'), 130);
+  }
+
+  /* ------------------------------------------------------------------
+   * 순서 — 큐 · 도킹 · 재생 · 정지
+   * ---------------------------------------------------------------- */
+
+  /* 무대에 나와 있던 판을 상자로 돌려보낸다. 기다리지 않는다 —
+     새 판이 나오는 동안 옛 판은 제 갈 길로 돌아간다. */
+  function sendBack(index) {
+    const card = cards[index];
+    const from = readPlace(card);
+    const to = cratePlace(index, crate.pos, 0);
+
+    flying.add(index);
+    card.classList.remove('is-docked');
+    card.style.zIndex = String(100 + index);
+    card._spin.removeAttribute('transform');
+
+    return flyTo(card, from, to, TIMING.back, EASE.out, {
+      x: (to.x - from.x) * 0.08,
+      y: -geo.D * 0.16,
+    }).then(() => {
+      flying.delete(index);
+      card.classList.add('is-pickable');
+      card.style.opacity = '1';
     });
-    bufG.restore();
+  }
 
-    lcdG.globalAlpha = 1;
-    lcdG.fillStyle = ground;
-    lcdG.fillRect(0, 0, LCD_W, LCD_H);
-    lcdG.globalAlpha = lcd.contrast;
-    lcdG.drawImage(lcdBuf, 0, 0);
-    lcdG.globalAlpha = 1;
+  /* 지금 화면 위에 서 있는 자리를 그대로 읽어 온다.
+     상자를 재지 않고 변형 행렬에서 곧장 뽑는다 — SVG 가 상자 밖으로 조금
+     넘쳐 그려지는 탓에 getBoundingClientRect 는 판보다 넓게 나온다.
+     판은 왼쪽 위 (0,0) 에 놓이므로 제자리 중심은 늘 (D/2, D/2) 이고,
+     크기 변화는 그 중심을 움직이지 않는다. */
+  function readPlace(card) {
+    const m = new DOMMatrixReadOnly(getComputedStyle(card).transform);
+    const half = geo.D / 2;
+    return { x: m.e + half, y: m.f + half, s: m.a || 1 };
+  }
 
-    if (!on) {
-      lcdG.fillStyle = 'rgba(18,20,14,0.82)';
-      lcdG.fillRect(0, LCD_H * 0.2 - LCD_H * 0.07, LCD_W, LCD_H * 0.14);
-      lcdG.fillStyle = 'rgba(150,171,124,0.72)';
-      lcdG.font = '700 ' + (LCD_H * 0.07).toFixed(1) + 'px ' + FACE_FONT;
-      lcdG.textAlign = 'center';
-      lcdG.textBaseline = 'middle';
-      lcdG.fillText('INSERT CARTRIDGE', LCD_W / 2, LCD_H * 0.2);
+  async function cue(index) {
+    if (index === out && state === 'cued') return;
+    const my = ++gen;
+
+    if (state === 'screen') leaveScreen();
+    if (state === 'playing' || state === 'paused' || state === 'screen') {
+      setArm(DECK.arm.rest, TIMING.armOut, EASE.arm, false);
+    }
+
+    const leaving = out;
+    spin.target = 0;
+    spin.deg = 0;
+    state = 'cueing';
+    syncTransport();
+
+    const track = tracks[index];
+    const card = cards[index];
+    const from = readPlace(card);      // 지금 서 있는 자리에서 이어 간다
+
+    out = index;
+    gap.value = leaving >= 0 ? gap.value : 0;
+    gap.target = 1;
+    crate.target = index;
+    if (leaving >= 0 && leaving !== index) sendBack(leaving);
+
+    card.classList.remove('is-pickable', 'is-focus', 'is-docked');
+    card.style.opacity = '1';
+    card.style.zIndex = '900';
+
+    const to = spotPlace();
+    say('CUEING', true);
+
+    const flight = flyTo(card, from, to, TIMING.pick, EASE.arc, {
+      x: (from.x - to.x) * 0.1,
+      y: -geo.D * 0.26,
+    });
+    setTimeout(() => { if (my === gen) showBillboard(track); }, TIMING.pick * 0.42);
+
+    await flight;
+    if (my !== gen) return;
+
+    state = 'cued';
+    syncTransport();
+    say('PRESS PLAY · THE ARM SWINGS IN');
+  }
+
+  async function play() {
+    if (state === 'playing' || state === 'screen') return;
+
+    /* 멈춰 있던 자리에서 다시 이어 간다 */
+    if (state === 'paused') {
+      const my = ++gen;
+      state = 'playing';
+      syncTransport();
+      setArm(liveArmDeg(), TIMING.drop, EASE.out, false);   // 들었던 바늘을 그 자리에 내린다
+      spin.target = FULL_RATE;
+      await wait(TIMING.drop);
+      if (my !== gen) return;
+      startTrack(my);
       return;
     }
 
-    // 기동 — 마크가 위에서 내려와 한 박자 머문다
-    if (lcd.boot >= 0) {
-      const b = clamp((now - lcd.boot) / TIMING.boot, 0, 1);
-      const slide = b < 0.62 ? b / 0.62 : 1;
-      const e = 1 - Math.pow(1 - slide, 3);
-      const y = lerp(-LCD_H * 0.14, LCD_H * 0.2, e);
-      lcdG.fillStyle = ground;
-      lcdG.fillRect(0, 0, LCD_W, LCD_H);
-      lcdG.fillStyle = interaction.screen.ink;
-      lcdG.textAlign = 'center';
-      lcdG.textBaseline = 'middle';
-      lcdG.font = '700 ' + (LCD_H * 0.125).toFixed(1) + 'px ' + FACE_FONT;
-      lcdG.fillText('CRAFT BOY', LCD_W / 2, y);
-      lcdG.font = '700 ' + (LCD_H * 0.055).toFixed(1) + 'px ' + FACE_FONT;
-      lcdG.globalAlpha = b > 0.72 ? 1 : 0;
-      lcdG.fillText(
-        'SIDE LOAD  ·  NO. ' + interaction.number,
-        LCD_W / 2,
-        y + LCD_H * 0.13,
-      );
-      lcdG.globalAlpha = 1;
-      if (b >= 1) lcd.boot = -1;
+    if (state !== 'cued') {
+      await cue(focus);
+      if (state !== 'cued') return;
     }
+
+    const my = ++gen;
+    state = 'docking';
+    syncTransport();
+    say('LOADING THE PLATTER', true);
+
+    const card = cards[out];
+    const from = readPlace(card);
+    const to = platterPlace();
+
+    card.classList.add('is-docked');
+    card.style.zIndex = '';
+
+    await flyTo(card, from, to, TIMING.dock, EASE.arc, {
+      x: (to.x - from.x) * 0.06,
+      y: -geo.D * 0.3,
+    });
+    if (my !== gen) return;
+
+    /* 판이 앉자마자 돌기 시작하고, 톤암이 뒤따라 안쪽으로 들어온다 */
+    spin.target = FULL_RATE;
+    setArm(DECK.arm.lead, TIMING.armIn, EASE.arm, true);
+    say('THE ARM SWINGS IN', true);
+    await wait(TIMING.armIn);
+    if (my !== gen) return;
+
+    /* 바늘이 홈에 내려앉는다 */
+    setArm(DECK.arm.lead, TIMING.drop, EASE.out, false);
+    await wait(TIMING.drop);
+    if (my !== gen) return;
+
+    state = 'playing';
+    syncTransport();
+    startTrack(my);
   }
 
-  /* ==================================================================
-   * 화면 안 — 확대가 끝난 뒤의 실물
-   * ================================================================ */
+  /* 바늘이 앉은 뒤 — 톤암이 아주 느리게 안쪽으로 파고들고,
+     5초를 세고 나면 무대가 사라지고 곡의 화면이 올라온다. */
+  async function startTrack(my) {
+    const track = tracks[out];
+    playedAt = performance.now();
+    setArm(DECK.arm.runOut, 240000, 'linear', false);
+
+    const beats = Math.max(1, Math.round(TIMING.lead / 1000));
+    for (let n = beats; n > 0; n -= 1) {
+      say(`${track.title.toUpperCase()} · ${track.artist.toUpperCase()} · ${n}`);
+      await wait(TIMING.lead / beats);
+      if (my !== gen) return;
+    }
+
+    enterScreen(track);
+  }
+
+  function enterScreen(track) {
+    state = 'screen';
+    syncTransport();
+    sizeVisual();
+
+    vh.side.textContent = `SIDE ${track.side}`;
+    vh.title.textContent = track.title;
+    vh.artist.textContent = track.artist;
+    vh.hint.textContent = track.hint;
+    vh.bpm.textContent = `${track.bpm} BPM`;
+    vh.needle.style.background = track.scene.ink;
+
+    hideBillboard();
+    roomEl.classList.add('is-gone');
+    visualEl.classList.add('is-on');
+    visualEl.setAttribute('aria-hidden', 'false');
+  }
+
+  function leaveScreen() {
+    visualEl.classList.remove('is-on');
+    visualEl.setAttribute('aria-hidden', 'true');
+    roomEl.classList.remove('is-gone');
+  }
+
+  function pause() {
+    if (state !== 'playing' && state !== 'screen') return;
+    gen += 1;
+    if (state === 'screen') leaveScreen();
+    state = 'paused';
+    syncTransport();
+    spin.target = 0;
+    setArm(liveArmDeg(), TIMING.drop * 1.8, EASE.out, true);   // 파고들던 자리에서 멈춰 든다
+    say('PAUSED · THE ARM IS HELD');
+  }
+
+  async function stop() {
+    if (state === 'idle' || state === 'returning' || out < 0) return;
+    const my = ++gen;
+    if (state === 'screen') leaveScreen();
+
+    state = 'returning';
+    syncTransport();
+    hideBillboard();
+    say('THE ARM SWINGS OUT', true);
+
+    spin.target = 0;
+    setArm(DECK.arm.rest, TIMING.armOut, EASE.arm, false);
+    await wait(TIMING.armOut * 0.55);
+    if (my !== gen) return;
+
+    const index = out;
+    out = -1;
+    gap.target = 0;
+    crate.target = index;
+    await sendBack(index);
+    if (my !== gen) return;
+
+    state = 'idle';
+    syncTransport();
+    say('SCROLL OR DRAG THE CRATE · CLICK A RECORD TO CUE');
+  }
+
+  function skip(direction) {
+    const live = state === 'playing' || state === 'screen' || state === 'paused';
+    /* 재생 중이면 지금 도는 판을, 아니면 상자가 향하는 곳을 기준으로 삼는다 —
+       그래야 연달아 누른 만큼 계속 넘어간다. */
+    const here = live ? out : Math.round(crate.target);
+    const next = clamp(here + direction, 0, tracks.length - 1);
+    if (next === here) return;
+
+    crate.target = next;
+    if (!live) return;                            // 상자만 넘기면 무대가 따라온다
+    cue(next).then(() => play());
+  }
+
+  /* ------------------------------------------------------------------
+   * 화면 안 — 곡의 인터랙션
+   * ---------------------------------------------------------------- */
 
   const ptr = { x: 0.5, y: 0.5, dx: 0, dy: 0, down: false, tx: 0, ty: 0, vx: 0, vy: 0 };
+  let playedAt = 0;
+  let visualW = 0;
+  let visualH = 0;
 
-  // 캔버스의 실제 상자에서 크기를 딴다. 창이 바뀌는 도중에 잰 값으로
-  // 뒷판을 잡아 두면 가장자리에 그리지 않은 띠가 남는다.
-  let playW = 0, playH = 0;
-
-  function sizePlay() {
+  function sizeVisual() {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    playW = playCv.clientWidth || window.innerWidth;
-    playH = playCv.clientHeight || window.innerHeight;
-    playCv.width = Math.round(playW * dpr);
-    playCv.height = Math.round(playH * dpr);
-    playG.setTransform(dpr, 0, 0, dpr, 0, 0);
+    visualW = visualCv.clientWidth || window.innerWidth;
+    visualH = visualCv.clientHeight || window.innerHeight;
+    visualCv.width = Math.round(visualW * dpr);
+    visualCv.height = Math.round(visualH * dpr);
+    visualG.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  function stepPtr(dt) {
+  function stepPointer(dt) {
     const k = Math.min(2, dt / 16.7);
     if (!ptr.down) { ptr.tx = 0; ptr.ty = 0; }
     ptr.vx = (ptr.vx + (ptr.tx - ptr.dx) * 0.17 * k) * Math.pow(0.78, k);
@@ -261,497 +591,214 @@ import { getInteractions } from './src/interactions/index.js';
     ptr.dy += ptr.vy * k;
   }
 
-  function paintPlay(now) {
-    if (playCv.clientWidth !== playW || playCv.clientHeight !== playH) sizePlay();
-    const interaction = interactions[focus];
-    const W = playW, H = playH;
-    playG.fillStyle = interaction.screen.paper;
-    playG.fillRect(0, 0, W, H);
-    playG.save();
-    interaction.render({
-      context: playG,
-      width: W,
-      height: H,
+  function paintVisual(now, dt) {
+    if (visualCv.clientWidth !== visualW || visualCv.clientHeight !== visualH) sizeVisual();
+    const track = tracks[out];
+    if (!track) return;
+
+    const beat = ((now - playedAt) / (60000 / track.bpm));
+    const pulse = Math.pow(1 - (beat % 1), 3);
+
+    visualG.fillStyle = track.scene.ground;
+    visualG.fillRect(0, 0, visualW, visualH);
+    visualG.save();
+    track.render({
+      context: visualG,
+      width: visualW,
+      height: visualH,
       time: now,
-      color: interaction.screen.ink,
+      dt,
+      beat,
+      pulse,
       pointer: ptr,
+      palette: POP,
     });
-    playG.restore();
+    visualG.restore();
+
+    vh.needle.style.transform = `scale(${(1 + pulse * 0.34).toFixed(3)})`;
   }
 
-  /* ==================================================================
-   * 넣기 — 칩이 날아가 홈에 앉고, 불이 들어오고, 화면 안으로 들어간다
-   * ================================================================ */
-
-  const seq = { skip: false, timers: [], anims: [] };
-
-  /* 칩은 어느 부모에 들어가든 제 상자의 한가운데를 기준으로 앉는다.
-     그래서 부모를 갈아 끼워도 그 중심만 다시 재면 화면 위 자리가
-     어긋나지 않는다 — 카드 한 장이 선반·허공·슬롯을 그대로 건너간다.
-     복제본이 없으니 패키지 도안도 하나뿐이다. */
-
-  const midOf = (r) => ({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
-
-  /* 변형을 걷어낸 맨 자리의 중심. 재고 바로 되돌리므로 화면에는 남지 않는다. */
-  function restCenter(chip) {
-    const prev = chip.style.transform;
-    chip.style.transform = 'none';
-    const r = chip.getBoundingClientRect();
-    chip.style.transform = prev;
-    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-  }
-
-  function poseAt(o, cx, cy, s, rotation = 0) {
-    return 'translate3d(' + (cx - o.x).toFixed(2) + 'px,'
-      + (cy - o.y).toFixed(2) + 'px,0) rotate(' + rotation.toFixed(2) + 'deg) '
-      + 'scale(' + s.toFixed(4) + ')';
-  }
-
-  /* 부모를 바꿔 달되 화면 위 자리는 그대로 둔다 */
-  function reparent(chip, parent, cx, cy, s, rotation = 0) {
-    parent.appendChild(chip);
-    const o = restCenter(chip);
-    chip.style.transform = poseAt(o, cx, cy, s, rotation);
-    return o;
-  }
-
-  /* 끝난 자리를 인라인으로 못박고 애니메이션을 거둔다. 순서가 중요하다 —
-     먼저 써 두어야 거두는 순간에 한 프레임도 튀지 않는다. */
-  function land(chip, anim, pose) {
-    chip.style.transform = pose;
-    anim.cancel();
-  }
-
-  /* 오른쪽 옆면 슬롯의 자리. 세로 카드를 90도 돌린 뒤 왼쪽으로 밀어
-     전체 길이의 약 1/4만 손잡이처럼 본체 밖에 남긴다. */
-  function dockPose() {
-    const c = consoleEl.getBoundingClientRect();
-    const p = cartProbe.getBoundingClientRect();
-    const s = p.width / cardW;
-    const total = cardH * s;
-    const visible = total * 0.58;
-    return {
-      x: c.right + visible - total / 2,
-      approach: c.right + 22 + total / 2,
-      y: c.top + c.height * 0.527,
-      s,
-      total,
-    };
-  }
-
-  /* 파일 스택에서 선택 칩이 서는 한 점. */
-  function railHome() {
-    const r = railEl.getBoundingClientRect();
-    return { x: r.left + r.width / 2, y: r.top };
-  }
-
-  function wait(ms) {
-    if (seq.skip || REDUCED_MOTION) return Promise.resolve();
-    return new Promise((res) => {
-      const id = setTimeout(() => {
-        const n = seq.timers.findIndex((t) => t.id === id);
-        if (n >= 0) seq.timers.splice(n, 1);
-        res();
-      }, ms);
-      seq.timers.push({ id, res });
-    });
-  }
-
-  function run(el, frames, opts) {
-    const a = el.animate(frames, Object.assign({ fill: 'forwards' }, opts));
-    seq.anims.push(a);
-    a.finished.catch(() => {}).then(() => {
-      const n = seq.anims.indexOf(a);
-      if (n >= 0) seq.anims.splice(n, 1);
-    });
-    if (seq.skip) a.finish();
-    return a;
-  }
-
-  function skipSequence() {
-    if (state !== 'inserting') return;
-    seq.skip = true;
-    seq.anims.slice().forEach((a) => { try { a.finish(); } catch (e) {} });
-    seq.timers.splice(0).forEach((t) => { clearTimeout(t.id); t.res(); });
-  }
-
-  /* 화면(LCD)이 눈앞을 꽉 채우도록 stage 를 밀고 키우는 값 */
-  function zoomTransform() {
-    const prev = stageEl.style.transform;
-    stageEl.style.transform = 'none';
-    const r = lcdEl.getBoundingClientRect();
-    stageEl.style.transform = prev;
-    const k = Math.max(innerWidth / r.width, innerHeight / r.height) * 1.02;
-    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-    return 'translate(' + (-k * (cx - innerWidth / 2)).toFixed(2) + 'px,'
-      + (-k * (cy - innerHeight / 2)).toFixed(2) + 'px) scale(' + k.toFixed(4) + ')';
-  }
-
-  let zoomPose = '';
-  let interactionHistoryActive = false;
-  let historyReturnPending = false;
-  let returnAfterInsert = false;
-
-  /* 인터랙션은 별도 페이지처럼 느껴지지만 실제 URL은 그대로다. 같은 URL의
-     히스토리 항목을 한 칸 쌓아 브라우저 뒤로가기를 홈 복귀에 사용한다. */
-  function pushInteractionHistory() {
-    if (interactionHistoryActive) return;
-    try {
-      history.pushState({ craftBoyInteraction: true }, '', location.href);
-      interactionHistoryActive = true;
-    } catch (error) {
-      interactionHistoryActive = false;
-    }
-  }
-
-  async function insert() {
-    if (state !== 'shelf') return;
-    state = 'inserting';
-    seq.skip = false;
-    returnAfterInsert = false;
-    pushInteractionHistory();
-
-    const i = clamp(Math.round(rail.target), 0, interactions.length - 1);
-    if (i !== focus) setNow(i);
-    const interaction = interactions[i];
-    const chip = chips[i];
-
-    // 이 칩만 선반의 손에서 뗀다 — layoutRail 이 매 프레임 덮어쓰지 않도록
-    away = i;
-    chip.classList.add('is-active');
-    chip.classList.remove('is-focus');
-    chip.setAttribute('role', 'presentation');
-    chip.setAttribute('aria-hidden', 'true');
-
-    const start = midOf(chip.getBoundingClientRect());
-    const s0 = scaleOf(i - rail.pos);
-    const dock = dockPose();
-
-    // 남은 파일은 오른쪽으로 물러나고, 고른 한 장만 허공으로 옮겨 붙는다.
-    const o = reparent(chip, flightEl, start.x, start.y, s0);
-    railEl.classList.add('is-gone');
-
-    // 파일을 스택에서 왼쪽으로 뽑으며 가로로 돌려 포트 앞에 정렬한다.
-    const fly = run(chip, [
-      { transform: poseAt(o, start.x, start.y, s0), easing: EASE.out },
-      { transform: poseAt(o, start.x - cardW * 0.12, start.y - cardW * 0.03, s0 * 1.02, 24),
-        offset: 0.26, easing: PLUCK_EASE },
-      { transform: poseAt(o, dock.approach, dock.y, dock.s, 90) },
-    ], { duration: REDUCED_MOTION ? 1 : TIMING.flight });
-    await fly.finished.catch(() => {});
-    land(chip, fly, poseAt(o, dock.approach, dock.y, dock.s, 90));
-
-    // 포트 바깥에 정렬된 순간 본체 뒤 레이어로 넘겨 왼쪽으로 밀어 넣는다.
-    const so = reparent(chip, seatEl, dock.approach, dock.y, dock.s, 90);
-    seatEl.classList.add('is-in');
-
-    const push = run(chip, [
-      { transform: poseAt(so, dock.approach, dock.y, dock.s, 90) },
-      { transform: poseAt(so, dock.x - 2, dock.y, dock.s, 90), offset: 0.84 },
-      { transform: poseAt(so, dock.x, dock.y, dock.s, 90) },
-    ], { duration: REDUCED_MOTION ? 1 : TIMING.seat, easing: EASE.drawer });
-
-    // 다 눌린 순간 기계가 한 번 받는다
-    setTimeout(() => {
-      if (REDUCED_MOTION || state !== 'inserting') return;
-      consoleEl.animate([
-        { transform: 'translateX(0)' },
-        { transform: 'translateX(-1.5px)' },
-        { transform: 'translateX(0)' },
-      ], { duration: 150, easing: 'ease-out' });
-    }, TIMING.seat * 0.72);
-
-    await push.finished.catch(() => {});
-    land(chip, push, poseAt(so, dock.x, dock.y, dock.s, 90));
-
-    // 불이 든다
-    ledEl.classList.add('is-on');
-    lcdEl.classList.add('is-on');
-    lcd.power = 1;
-    lcd.contrast = 1;
-    lcd.boot = performance.now();
-    await wait(TIMING.power + TIMING.boot);
-    lcd.boot = -1;
-
-    // 화면 안으로. 트랜지션이 아니라 애니메이션이라야 도중에 건너뛸 수 있다.
-    zoomPose = zoomTransform();
-    if (!REDUCED_MOTION) {
-      const z = run(stageEl, [
-        { transform: 'none' },
-        { transform: zoomPose },
-      ], { duration: TIMING.zoom, easing: EASE.out });
-      await z.finished.catch(() => {});
-      stageEl.style.transform = zoomPose;
-      z.cancel();
-    } else {
-      stageEl.style.transform = zoomPose;
-    }
-
-    playTitleEl.textContent = interaction.title;
-    playHintEl.textContent = interaction.hint;
-    playEl.style.setProperty('--play-ink', interaction.screen.ink);
-    playEl.setAttribute('aria-hidden', 'false');
-    playEl.classList.add('is-on');
-    roomEl.classList.add('is-inside');
-    ptr.dx = 0; ptr.dy = 0; ptr.vx = 0; ptr.vy = 0;
-    state = 'play';
-
-    // 삽입 애니메이션 중 뒤로가기를 눌렀다면 도착하자마자 홈으로 돌아간다.
-    if (returnAfterInsert) {
-      returnAfterInsert = false;
-      eject();
-    }
-  }
-
-  async function eject() {
-    if (state !== 'play') return;
-    state = 'ejecting';
-    seq.skip = false;
-
-    playEl.classList.remove('is-on');
-    playEl.setAttribute('aria-hidden', 'true');
-    roomEl.classList.remove('is-inside');
-    await wait(TIMING.fade);
-
-    if (!REDUCED_MOTION && zoomPose) {
-      const z = run(stageEl, [
-        { transform: zoomPose },
-        { transform: 'none' },
-      ], { duration: TIMING.out, easing: EASE.out });
-      await z.finished.catch(() => {});
-      stageEl.style.transform = '';
-      z.cancel();
-    } else {
-      stageEl.style.transform = '';
-    }
-    zoomPose = '';
-
-    // 들어온 길을 그대로 되짚는다 — 슬롯에서 뽑히고, 선반으로 돌아간다
-    const chip = chips[focus];
-    const dock = dockPose();
-    const so = restCenter(chip);
-
-    const pull = run(chip, [
-      { transform: poseAt(so, dock.x, dock.y, dock.s, 90) },
-      { transform: poseAt(so, dock.approach, dock.y, dock.s, 90) },
-    ], { duration: REDUCED_MOTION ? 1 : TIMING.seat, easing: EASE.out });
-    await pull.finished.catch(() => {});
-    land(chip, pull, poseAt(so, dock.approach, dock.y, dock.s, 90));
-
-    seatEl.classList.remove('is-in');
-    const o = reparent(chip, flightEl, dock.approach, dock.y, dock.s, 90);
-    railEl.classList.remove('is-gone');
-
-    const home = railHome();
-    const back = run(chip, [
-      { transform: poseAt(o, dock.approach, dock.y, dock.s, 90) },
-      { transform: poseAt(o, dock.approach + dock.total * 0.08, dock.y, dock.s, 72),
-        offset: 0.24, easing: PLUCK_EASE },
-      { transform: poseAt(o, home.x, home.y, 1) },
-    ], { duration: REDUCED_MOTION ? 1 : TIMING.flight, easing: EASE.out });
-    await back.finished.catch(() => {});
-
-    // 선반이 다시 이 칩의 자리를 맡는다. 만든 차례 그대로 끼워 넣어야
-    // 좌우 대칭인 이웃의 겹침 순서가 바뀌지 않는다.
-    railEl.insertBefore(chip, chips[focus + 1] || null);
-    chip.classList.remove('is-active');
-    chip.setAttribute('role', 'option');
-    chip.removeAttribute('aria-hidden');
-    away = -1;
-    rail.pos = focus;
-    rail.target = focus;
-    layoutRail();
-    back.cancel();
-
-    ledEl.classList.remove('is-on');
-    lcdEl.classList.remove('is-on');
-    lcd.power = 0;
-    lcd.contrast = 0.17;
-    state = 'shelf';
-  }
-
-  /* 닫기 버튼과 Escape도 브라우저 뒤로가기와 같은 히스토리 한 칸을
-     소비한다. 그래야 닫힌 뒤에 인터랙션용 항목이 남지 않는다. */
-  function requestEject() {
-    if (state !== 'play') return;
-    if (interactionHistoryActive) {
-      if (historyReturnPending) return;
-      historyReturnPending = true;
-      history.back();
-      return;
-    }
-    eject();
-  }
-
-  addEventListener('popstate', () => {
-    if (!interactionHistoryActive) return;
-    interactionHistoryActive = false;
-    historyReturnPending = false;
-
-    if (state === 'inserting') {
-      returnAfterInsert = true;
-      skipSequence();
-      return;
-    }
-    if (state === 'play') eject();
-  });
-
-  /* ==================================================================
-   * 한 판 — 그리기
-   * ================================================================ */
+  /* ------------------------------------------------------------------
+   * 한 프레임
+   * ---------------------------------------------------------------- */
 
   let last = performance.now();
+
   function frame(now) {
-    const dt = Math.min(48, now - last);
+    const dt = Math.min(64, now - last);
     last = now;
 
-    if (state !== 'play') {
-      stepRail(dt);
-      layoutRail();
-      if (state === 'shelf') syncNow();
-    }
-    if (state !== 'play') paintLcd(now);
-    if (state === 'play') {
-      stepPtr(dt);
-      paintPlay(now);
+    stepCrate(dt);
+    syncFocus();
+    layoutCrate();
+    stepSpin(dt);
+
+    if (state === 'screen') {
+      stepPointer(dt);
+      paintVisual(now, dt);
     }
     requestAnimationFrame(frame);
   }
 
-  /* ==================================================================
+  /* ------------------------------------------------------------------
    * 입력
-   * ================================================================ */
+   * ---------------------------------------------------------------- */
 
-  const LAST = interactions.length - 1;
-
-  function goto(i) {
-    rail.target = clamp(i, 0, LAST);
-  }
-
-  stageEl.addEventListener('pointerdown', (e) => {
-    if (state !== 'shelf') return;
-    stageEl.setPointerCapture(e.pointerId);
-    rail.drag = { y: e.clientY, from: rail.pos, moved: 0 };
-    stageEl.classList.add('is-dragging');
+  /* 포인터를 붙잡지 않는다. 붙잡으면 pointerup 이 방으로 되돌려져
+     판 위에서 뗀 손가락이 클릭으로 이어지지 않는다. 방은 화면을 다 덮으니
+     창에서 듣는 것으로 충분하다. */
+  roomEl.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || event.target.closest('.tkey')) return;
+    crate.drag = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      from: crate.pos,
+      moved: 0,
+    };
   });
 
-  stageEl.addEventListener('pointermove', (e) => {
-    const d = rail.drag;
-    if (!d) return;
-    const dy = e.clientY - d.y;
-    d.moved = Math.max(d.moved, Math.abs(dy));
-    rail.pos = clamp(d.from - dy / stepPx(), 0, LAST);
+  addEventListener('pointermove', (event) => {
+    const drag = crate.drag;
+    if (!drag || drag.id !== event.pointerId) return;
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    drag.moved = Math.max(drag.moved, Math.hypot(dx, dy));
+    /* 상자의 대각선 위로 손가락을 투영한다 */
+    const along = dx * geo.axis.x + dy * geo.axis.y;
+    crate.pos = clamp(drag.from - along / geo.step, -0.6, tracks.length - 0.4);
   });
 
-  function endDrag(e) {
-    const d = rail.drag;
-    if (!d) return;
-    rail.drag = null;
-    stageEl.classList.remove('is-dragging');
-    if (stageEl.hasPointerCapture?.(e.pointerId)) stageEl.releasePointerCapture(e.pointerId);
+  let lastDragMoved = 0;
 
-    // 놓은 자리에서 가장 가까운 카드로 짧게 스냅한다. 관성·튕김은 없다.
-    goto(Math.round(rail.pos));
-
-    if (d.moved < 6) {
-      const under = document.elementFromPoint(e.clientX, e.clientY);
-      const chip = under && under.closest ? under.closest('.chip') : null;
-      const i = chip ? Number(chip.dataset.i) : -1;
-      if (i >= 0) {
-        if (i === focus && Math.abs(rail.pos - focus) < 0.35) insert();
-        else goto(i);
-      }
-    }
+  function endDrag(event) {
+    const drag = crate.drag;
+    if (!drag || drag.id !== event.pointerId) return;
+    lastDragMoved = drag.moved;
+    crate.drag = null;
+    crate.target = clamp(Math.round(crate.pos), 0, tracks.length - 1);
   }
-  stageEl.addEventListener('pointerup', endDrag);
-  stageEl.addEventListener('pointercancel', endDrag);
 
-  stageEl.addEventListener('wheel', (e) => {
-    if (state !== 'shelf') return;
-    e.preventDefault();
+  addEventListener('pointerup', endDrag);
+  addEventListener('pointercancel', endDrag);
+
+  roomEl.addEventListener('wheel', (event) => {
+    event.preventDefault();
     const now = performance.now();
-    if (now - rail.wheelAt > 220) rail.wheel = 0;
-    rail.wheelAt = now;
-    rail.wheel += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-    if (Math.abs(rail.wheel) > 42) {
-      goto(Math.round(rail.target) + Math.sign(rail.wheel));
-      rail.wheel = 0;
-    }
+    const delta = Math.abs(event.deltaY) > Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+    crate.wheel += delta;
+    if (now - crate.wheelAt < 90 || Math.abs(crate.wheel) < 26) return;
+    crate.wheelAt = now;
+    crate.target = clamp(
+      crate.target + Math.sign(crate.wheel),
+      0,
+      tracks.length - 1,
+    );
+    crate.wheel = 0;
   }, { passive: false });
 
-  addEventListener('keydown', (e) => {
-    if (state === 'inserting') { skipSequence(); return; }
-    if (e.key === 'Escape') { requestEject(); return; }
-    if (state !== 'shelf') return;
-    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-      goto(Math.round(rail.target) + 1); e.preventDefault();
-    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-      goto(Math.round(rail.target) - 1); e.preventDefault();
+  cards.forEach((card, i) => {
+    card.addEventListener('click', () => {
+      if (crate.drag || lastDragMoved > 6) return;
+      crate.target = i;
+      cue(i);
+    });
+  });
+
+  roomEl.addEventListener('click', (event) => {
+    if (event.target.closest('.record, .tkey') || lastDragMoved > 6) return;
+    if (state === 'idle') cue(focus);
+  });
+
+  transportEl.addEventListener('click', (event) => {
+    const key = event.target.closest('.tkey');
+    if (!key || key.disabled) return;
+    hit(key);
+    ({ prev: () => skip(-1), next: () => skip(1), play, pause, stop }[key.dataset.act])();
+  });
+
+  liftEl.addEventListener('click', stop);
+
+  addEventListener('keydown', (event) => {
+    const map = {
+      ArrowLeft: () => skip(-1),
+      ArrowUp: () => skip(-1),
+      ArrowRight: () => skip(1),
+      ArrowDown: () => skip(1),
+      Escape: stop,
+    };
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault();
+      hit(state === 'playing' || state === 'screen' ? keys.pause : keys.play);
+      (state === 'playing' || state === 'screen' ? pause : play)();
+      return;
     }
-    else if (e.key === 'Enter' || e.key === ' ') { insert(); e.preventDefault(); }
+    const run = map[event.key];
+    if (!run) return;
+    event.preventDefault();
+    run();
   });
 
-  // 삽입 중에 화면을 누르면 끝으로 건너뛴다 — 기다리게 두지 않는다
-  addEventListener('pointerdown', () => { if (state === 'inserting') skipSequence(); }, true);
-
-  ejectEl.addEventListener('click', requestEject);
-
-  playCv.addEventListener('pointerdown', (e) => {
-    playCv.setPointerCapture(e.pointerId);
+  visualCv.addEventListener('pointerdown', (event) => {
     ptr.down = true;
-    ptr.ox = e.clientX;
-    ptr.oy = e.clientY;
+    ptr.px = event.clientX;
+    ptr.py = event.clientY;
+    visualCv.setPointerCapture?.(event.pointerId);
   });
-  playCv.addEventListener('pointermove', (e) => {
-    ptr.x = e.clientX / (playW || window.innerWidth);
-    ptr.y = e.clientY / (playH || window.innerHeight);
+
+  visualCv.addEventListener('pointermove', (event) => {
+    ptr.x = clamp(event.clientX / window.innerWidth, 0, 1);
+    ptr.y = clamp(event.clientY / window.innerHeight, 0, 1);
     if (!ptr.down) return;
-    const unit = Math.min(playW, playH) * 0.34;
-    ptr.tx = clamp((e.clientX - ptr.ox) / unit, -1, 1);
-    ptr.ty = clamp((e.clientY - ptr.oy) / unit, -1, 1);
+    ptr.tx = clamp((event.clientX - ptr.px) / (window.innerWidth * 0.32), -1, 1);
+    ptr.ty = clamp((event.clientY - ptr.py) / (window.innerHeight * 0.32), -1, 1);
   });
-  function playUp(e) {
+
+  function releasePointer(event) {
     ptr.down = false;
-    playCv.releasePointerCapture?.(e.pointerId);
+    visualCv.releasePointerCapture?.(event.pointerId);
   }
-  playCv.addEventListener('pointerup', playUp);
-  playCv.addEventListener('pointercancel', playUp);
+
+  visualCv.addEventListener('pointerup', releasePointer);
+  visualCv.addEventListener('pointercancel', releasePointer);
 
   addEventListener('resize', () => {
-    readSizes();
-    repaintArt();
-    sizePlay();
-    // 슬롯에 앉아 있는 칩은 창이 바뀌면 자리를 다시 잡아야 한다
-    if (away >= 0 && chips[away].parentElement === seatEl) {
-      const chip = chips[away];
-      const d = dockPose();
-      chip.style.transform = poseAt(restCenter(chip), d.x, d.y, d.s, 90);
+    measure();
+    layoutCrate();
+    if (out >= 0) {
+      const place = state === 'playing' || state === 'screen' || state === 'paused'
+        ? platterPlace()
+        : spotPlace();
+      cards[out].style.transform = poseAt(place.x, place.y, place.s);
     }
-    if (state === 'play') {
-      zoomPose = zoomTransform();
-      stageEl.style.transform = zoomPose;
-    }
+    if (state === 'screen') sizeVisual();
   });
 
-  /* ==================================================================
-   * 시작 — 칩이 차례로 자리를 잡는다
-   * ================================================================ */
+  /* ------------------------------------------------------------------
+   * 시작
+   * ---------------------------------------------------------------- */
 
-  readSizes();
-  sizePlay();
-  layoutRail();
-  setNow(INITIAL);
-  requestAnimationFrame(() => {
-    repaintArt();
-    if (!REDUCED_MOTION) {
-      chips.forEach((chip, i) => {
-        chip.animate([
-          { opacity: 0, transform: chip.style.transform + ' translateX(16px)' },
-          { opacity: 1, transform: chip.style.transform },
-        ], { duration: 520, delay: 60 + Math.abs(i - focus) * 45, easing: EASE.out, fill: 'backwards' });
-      });
-    }
-  });
-  document.fonts?.ready.then(repaintArt);
+  Object.assign(ptr, IDLE_POINTER);
+  measure();
+  setArm(DECK.arm.rest, 1, EASE.out, false);
+  layoutCrate();
+  syncTransport();
   requestAnimationFrame(frame);
+
+  document.fonts?.ready.then(() => { measure(); layoutCrate(); });
+
+  /* 첫 인상 — 판 한 장은 이미 무대에 나와 있다 */
+  setTimeout(() => { if (state === 'idle') cue(0); }, 420);
+
+  /* 확인용 — 지금 무대가 어떤 상태인지 한 줄로 읽는다 */
+  window.__hotwax = () => ({
+    state,
+    focus,
+    out,
+    arm: armDeg,
+    spin: Number(spin.rate.toFixed(4)),
+    track: out >= 0 ? tracks[out].title : null,
+    billboard: billboardEl.classList.contains('is-on'),
+    screen: visualEl.classList.contains('is-on'),
+  });
 })();

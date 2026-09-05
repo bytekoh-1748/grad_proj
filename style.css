@@ -1,624 +1,611 @@
 /* ==================================================================
- * CRAFT BOY — 인터랙션 카트리지
+ * HOT WAX — 팝아트 턴테이블
  *
- * 조판과 뼈대만 여기서 잡는다. 칩 위의 무늬와 화면 속 장면은
- * 캔버스가 그린다.
- *
- * 움직임의 기준은 emilkowalski/skills 를 따른다.
- *   · transform 과 opacity 만 움직인다
- *   · 들어오고 나가는 움직임은 ease-out 한다
- *   · 자주 보는 동작은 300ms 아래로, 드물게 보는 장면만 길게
- *   · scale(0) 에서 시작하지 않는다 — 없던 것이 생기지는 않는다
+ * 판은 다섯 장뿐이다. 노랑 바탕, 보라, 청록, 검정 윤곽, 흰 종이.
+ * 그라디언트도 흐린 그림자도 쓰지 않는다. 깊이는 검은 선을 한 번 더
+ * 긋고 색판을 어긋나게 겹쳐서만 만든다.
  * ================================================================ */
 
 :root {
-  --ink: #171717;
-  --line: #282828;
-  --ground: #F6F3EC;
-  --surface: #FBF9F4;
-  --card-paper: #FFFFFF;
+  --yellow: #FFC20E;
+  --yellow-deep: #F0A400;
+  --purple: #8B22F0;
+  --purple-deep: #5E10AE;
+  --teal: #12A98B;
+  --teal-deep: #0B7A63;
+  --pink: #F2A2AC;
+  --ink: #0D0D0D;
+  --paper: #FFFFFF;
 
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --edge: max(3px, 0.42vmin);          /* 기본 윤곽 굵기 */
+  --drop: max(4px, 0.62vmin);          /* 색판이 어긋나 앉는 거리 */
+  --rd: 33vmin;                        /* 판 한 장의 기준 지름 */
 
-  --mono: 'Quantico', 'Pretendard Variable', Pretendard, 'Noto Sans KR', sans-serif;
-  --serif: 'Instrument Serif', 'Pretendard Variable', Georgia, serif;
+  --display: 'Archivo Black', 'Pretendard Variable', Pretendard, sans-serif;
+  --mono: 'Quantico', 'Pretendard Variable', Pretendard, monospace;
 
-  /* 칩 한 장의 크기 — 모든 칩이 같다 */
-  --card-w: clamp(320px, min(36.3vw, 56vh), 580px);
-
-  /* 카드 겉선 — 오른쪽 위로 내민 귀의 폭. 카드 폭에 대한 비다.
-     몸통은 그만큼 좁으므로 슬롯도 같은 값으로 옮겨 앉힌다.
-     겉선 자체는 src/cartridge-shape.js 가 잰다 — 여기 값과 같아야 한다. */
-  --ear: 0.06;
-
-  /* 왼쪽의 본체와 옆면 포트에 들어갈 카트리지의 짧은 변 */
-  --deck-w: clamp(820px, min(82vw, 150vh), 1240px);
-  --cart-w: calc(var(--deck-w) * 0.22);
-  --cart-h: calc(var(--cart-w) / 0.76);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-snap: cubic-bezier(0.2, 0.9, 0.25, 1);
 }
 
 * { box-sizing: border-box; }
-html, body { height: 100%; }
 
-body {
+html, body {
+  height: 100%;
   margin: 0;
   overflow: hidden;
-  overscroll-behavior: none;
-  background: var(--ground);
+  background: var(--yellow);
   color: var(--ink);
   font-family: var(--mono);
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  touch-action: none;
 }
 
-/* 바탕 — 별도의 패널 없이 오브젝트가 기본 배경 위에 직접 떠 있다. */
+body { cursor: default; }
+
+/* ==================================================================
+ * 방
+ * ================================================================ */
+
 .room {
   position: fixed;
   inset: 0;
   overflow: hidden;
-  background: var(--ground);
-  transition: opacity 200ms ease;
+  background: var(--yellow);
+  transform-origin: 42% 46%;
+  transition:
+    opacity 760ms var(--ease-out),
+    transform 760ms var(--ease-out),
+    filter 760ms var(--ease-out);
 }
 
-.room.is-inside { opacity: 0; }
-
-/* ---- 확대의 주체 ------------------------------------------------- */
-
-.stage {
-  position: absolute;
-  z-index: 1;
-  inset: 0;
-  transform-origin: 50% 50%;
-  cursor: grab;
-  touch-action: none;
-  will-change: transform;
-}
-.stage.is-dragging { cursor: grabbing; }
-
-/* ---- 칩 ----------------------------------------------------------
-   오른쪽에서 파일 폴더처럼 세로로 포개진다. 자리는 script 가 잡는다. */
-
-.rail {
-  position: absolute;
-  left: 74.5%;
-  top: 47.5%;
-  width: 0;
-  height: 0;
-  outline: none;
-  transition: opacity 180ms ease, transform 260ms var(--ease-out);
-}
-.rail.is-gone { opacity: 0; transform: translateX(18px); pointer-events: none; }
-
-.chip {
-  --tab-space: calc(var(--w) * 0.085);
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: var(--w);
-  height: var(--h);
-  margin-left: calc(var(--w) / -2);
-  margin-top: calc(var(--h) / -2);
-  transform-origin: 50% 50%;
-  backface-visibility: hidden;
-  will-change: transform;
-}
-
-/* 인덱스 탭 — 카드마다 위치를 달리해 서류철의 층을 읽히게 한다. */
-.chip::before {
-  content: attr(data-tab);
-  position: absolute;
-  z-index: 0;
-  left: var(--tab-x, 10%);
-  top: 0;
-  display: grid;
-  place-items: start center;
-  width: 42%;
-  height: var(--tab-space);
-  padding-top: calc(var(--w) * 0.018);
-  clip-path: polygon(0 100%, 10% 28%, 19% 0, 81% 0, 90% 28%, 100% 100%);
-  background: var(--body);
-  color: #fff;
-  font-size: calc(var(--w) * 0.035);
-  font-weight: 700;
-  letter-spacing: 0.12em;
+.room.is-gone {
+  opacity: 0;
+  transform: scale(1.09);
   pointer-events: none;
 }
 
-/* 종이가 여러 장 겹친 듯한 한 줄의 뒷면. 입체 그림자는 쓰지 않는다. */
-.chip::after {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  left: 4px;
-  right: -4px;
-  top: calc(var(--tab-space) + 2px);
-  bottom: -4px;
-  border: 1px solid color-mix(in srgb, var(--body) 72%, var(--ink));
-  border-radius: 5px 5px 3px 3px;
-  background: var(--surface);
-  pointer-events: none;
-}
-
-.chip.is-focus { cursor: pointer; }
-
-.shape-defs {
+.anchor {
   position: absolute;
   width: 0;
   height: 0;
+  pointer-events: none;
 }
 
-/* 카드 앞면 — 기존 정보 구조는 유지하되, 면과 음영 대신 선과 여백으로 만든다. */
-.face {
-  --bw: calc(var(--w) * 0.045);
-  position: relative;
-  z-index: 1;
-  top: var(--tab-space);
-  display: flex;
-  width: 100%;
-  height: calc(100% - var(--tab-space));
-  padding: var(--bw);
-  border: 1.25px solid var(--line);
-  border-radius: 5px 5px 3px 3px;
-  background: var(--body);
-  overflow: hidden;
-  backface-visibility: hidden;
-  transition: transform 150ms var(--ease-out);
-}
+/* 판이 앉는 무대 한가운데 */
+#anchor-spot { left: 51%; top: 71%; }
+/* 상자의 대각선 — 이 두 점이 판의 줄을 정한다 */
+#anchor-crate-head { left: 96%; top: 20%; }
+#anchor-crate-tail { left: 79%; top: 116%; }
 
-.face-inner {
-  position: relative;
+/* ==================================================================
+ * 마크
+ * ================================================================ */
+
+.masthead {
+  position: absolute;
+  left: 44%;
+  top: 2.8vmin;
+  z-index: 30;
   display: flex;
-  flex: 1;
-  min-width: 0;
   flex-direction: column;
-  padding: calc(var(--w) * 0.052) calc(var(--w) * 0.054) calc(var(--w) * 0.045);
-  border: 1px solid color-mix(in srgb, var(--body) 55%, var(--line));
-  border-radius: 2px;
-  background: var(--card-paper);
+  gap: 0.3vmin;
+  pointer-events: none;
+  mix-blend-mode: normal;
+}
+
+.masthead-mark {
+  font-family: var(--display);
+  font-size: clamp(15px, 2.5vmin, 30px);
+  letter-spacing: 0.02em;
   color: var(--ink);
-  font-size: calc(var(--w) * 0.0475);
-  overflow: hidden;
-}
-.face-inner::before {
-  content: '';
-  position: absolute;
-  inset: 4px;
-  border: 1px solid color-mix(in srgb, var(--body) 20%, transparent);
-  pointer-events: none;
 }
 
-.face-inner > * {
-  transition: opacity 120ms ease;
-}
-.chip:not(.is-focus):not(.is-active) .face-inner > * {
-  opacity: 0;
-}
-
-.face-grip {
-  display: flex;
-  gap: 0.32em;
-  height: 0.44em;
-  margin-bottom: 1.05em;
-  color: var(--body);
-  opacity: 0.72;
-}
-.face-grip i {
-  flex: 1;
-  border: 0.7px solid currentColor;
-}
-
-.face-art {
-  display: block;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 2.34 / 1;
-}
-
-.face-title {
-  margin: auto 0 0;
-  font-family: var(--serif);
-  font-size: 1.86em;
-  font-weight: 400;
-  line-height: 1.02;
-  letter-spacing: 0.004em;
-  white-space: nowrap;
-}
-.face-title span { display: block; opacity: 0.62; }
-
-.face-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-top: 1.05em;
-  font-size: 0.62em;
+.masthead-sub {
+  font-size: clamp(8px, 1.18vmin, 13px);
   font-weight: 700;
-  letter-spacing: 0.09em;
-  line-height: 1.55;
-}
-.face-meta b { display: block; font-weight: 700; opacity: 0.42; }
-.face-meta em { font-style: normal; font-variant-numeric: tabular-nums; }
-.face-meta > span:last-child { text-align: right; }
-
-.face-sign {
-  display: block;
-  width: 74%;
-  margin-top: 0.45em;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.1;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  opacity: 0.92;
-}
-.face-rule {
-  height: 1px;
-  margin-top: 0.2em;
-  background: currentColor;
-  opacity: 0.36;
+  letter-spacing: 0.22em;
+  color: var(--ink);
+  opacity: 0.66;
 }
 
-.face-shade {
-  position: absolute;
-  inset: 0;
-  background: #fff;
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* ---- 도크 -----------------------------------------------------------
-   왼쪽에 놓인 기술 도면형 게임기. 모든 깊이는 그림자가 아니라 겹선,
-   절개선, 나사와 포트 구조로 표현한다. */
+/* ==================================================================
+ * 턴테이블 — 똑바로 그린 그림을 통째 기울인다
+ * ================================================================ */
 
 .deck {
   position: absolute;
-  left: calc(36vw - var(--deck-w));
-  top: 49%;
-  width: var(--deck-w);
-  transform: translateY(-50%);
+  left: -23vmin;
+  top: -7vmin;
+  width: 97vmin;
+  aspect-ratio: 760 / 560;
+  transform: rotate(24deg);
+  transform-origin: 50% 50%;
+  z-index: 4;
+  pointer-events: none;
 }
 
-/* 카트리지는 본체보다 한 층 뒤에서 오른쪽 옆면으로 들어간다. */
-.seat {
+/* 플래터의 한가운데를 가리키는 크기 없는 점. 데크가 기울어도 위치가 정확하다. */
+.platter-mark {
   position: absolute;
-  right: 0;
-  top: 50%;
-  z-index: 1;
+  left: 32.895%;      /* 250 / 760 */
+  top: 44.643%;       /* 250 / 560 */
   width: 0;
   height: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-.seat.is-in { opacity: 1; }
-
-.console {
-  position: relative;
   z-index: 2;
-  width: 100%;
-  aspect-ratio: 1.22;
-  border: 1.4px solid var(--line);
-  border-radius: 24px 30px 20px 18px;
-  background: var(--surface);
-  will-change: transform;
-}
-
-.console-inset {
-  position: absolute;
-  inset: 10px;
-  border: 1px solid color-mix(in srgb, var(--line) 62%, transparent);
-  border-radius: 17px 23px 14px 12px;
   pointer-events: none;
 }
 
-.screw {
+.deck-svg {
   position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.deck.deck-top { z-index: 6; }   /* 판(z:5)보다 위 — 바늘이 홈에 얹힌다 */
+
+/* 톤암 — 축을 중심으로 돈다. 각도·시간·완급을 스크립트가 변수로만 준다.
+   들어 올린 상태는 살짝 커지는 것으로 읽힌다 — 위에서 내려다본 화면이므로. */
+.tt-arm {
+  transform-box: view-box;
+  transform-origin: 600px 110px;
+  transform: rotate(var(--arm, -4deg)) scale(var(--arm-scale, 1));
+  transition: transform var(--arm-time, 1050ms) var(--arm-ease, cubic-bezier(0.5, 0, 0.2, 1));
+}
+
+/* ==================================================================
+ * 판 — 상자 · 무대 · 플래터를 한 장이 그대로 건너간다
+ * ================================================================ */
+
+.records {
+  position: absolute;
+  inset: 0;
   z-index: 5;
-  width: 11px;
-  aspect-ratio: 1;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-}
-.screw::after {
-  content: '';
-  position: absolute;
-  left: 2px;
-  right: 2px;
-  top: 50%;
-  border-top: 1px solid var(--line);
-  transform: rotate(-18deg);
-}
-.screw-nw { left: 20px; top: 20px; }
-.screw-ne { right: 20px; top: 20px; }
-.screw-sw { left: 20px; bottom: 20px; }
-.screw-se { right: 20px; bottom: 20px; }
-
-.console-mark {
-  position: absolute;
-  left: 7%;
-  top: 6.2%;
-  display: flex;
-  align-items: baseline;
-  gap: 1em;
-  white-space: nowrap;
-}
-.console-mark strong {
-  font-size: clamp(10px, 1vw, 15px);
-  letter-spacing: 0.12em;
-}
-.console-mark span {
-  font-size: clamp(5px, 0.48vw, 8px);
-  letter-spacing: 0.14em;
-  opacity: 0.62;
+  pointer-events: none;
 }
 
-/* 포트 안쪽의 두 평행선이 서랍 레일처럼 본체 안으로 이어진다. */
-.port-guide {
-  position: absolute;
-  z-index: 3;
-  right: 0;
-  top: 36.5%;
-  width: 29%;
-  height: 32%;
-  border: 1px solid var(--line);
-  border-right: 0;
-  background:
-    linear-gradient(var(--line), var(--line)) 12% 24% / 72% 1px no-repeat,
-    linear-gradient(var(--line), var(--line)) 12% 76% / 72% 1px no-repeat,
-    var(--surface);
-}
-.port-guide::before,
-.port-guide::after {
-  content: '';
-  position: absolute;
-  right: 8%;
-  width: 14%;
-  height: 17%;
-  border: 1px solid var(--line);
-  background: var(--surface);
-}
-.port-guide::before { top: 13%; }
-.port-guide::after { bottom: 13%; }
-
-.slot {
-  position: absolute;
-  z-index: 6;
-  right: -3px;
-  top: calc(52.7% - (var(--cart-w) + 6px) / 2);
-  width: 7px;
-  height: calc(var(--cart-w) + 6px);
-  border: 1px solid var(--line);
-  border-right-width: 2px;
-  background: var(--surface);
+.records:focus-visible {
+  outline: var(--edge) solid var(--ink);
+  outline-offset: calc(var(--edge) * -3);
 }
 
-.bezel {
-  position: absolute;
-  left: 7%;
-  top: 15.5%;
-  width: 56.5%;
-  padding: 2.2%;
-  border: 1.2px solid var(--line);
-  border-radius: 4px;
-  background: var(--surface);
-}
-.bezel::before {
-  content: 'DISPLAY / 240 × 160';
+.record {
   position: absolute;
   left: 0;
-  top: calc(100% + 7px);
-  font-size: clamp(5px, 0.45vw, 7px);
-  letter-spacing: 0.12em;
+  top: 0;
+  width: var(--rd);
+  height: var(--rd);
+  transform-origin: 50% 50%;
+  will-change: transform;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.lcd {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 3 / 2;
-  overflow: hidden;
-  border: 1.2px solid var(--line);
-  background:
-    repeating-linear-gradient(0deg, transparent 0 8px, rgba(23,23,23,0.07) 8px 9px),
-    #EDEAE2;
-  transition: background-color 180ms ease;
-}
-.lcd canvas {
+.record-svg {
   display: block;
   width: 100%;
   height: 100%;
-  image-rendering: pixelated;
-  opacity: 0;
-  transition: opacity 180ms ease;
+  overflow: visible;
+  filter: drop-shadow(var(--drop) calc(var(--drop) * 1.2) 0 rgba(13, 13, 13, 0.9));
 }
-.lcd.is-on { background: #141613; }
-.lcd.is-on canvas { opacity: 1; }
 
-.lcd-grid {
+.record.is-pickable { pointer-events: auto; cursor: pointer; }
+.record.is-docked   { z-index: 2; }
+.record.is-docked .record-svg { filter: none; }
+
+/* ==================================================================
+ * 대각선 타이포 — 판이 가운데 앉는 순간 비스듬히 밀려 들어온다
+ * ================================================================ */
+
+.billboard {
   position: absolute;
-  inset: 0;
+  left: 29%;
+  top: 29%;
+  width: 45%;
+  z-index: 8;
+  transform: rotate(-9.5deg);
+  transform-origin: 0 100%;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 180ms ease;
-  background-image:
-    repeating-linear-gradient(90deg, rgba(0,0,0,0.6) 0 1px, transparent 1px calc(100% / 60)),
-    repeating-linear-gradient(0deg, rgba(0,0,0,0.6) 0 1px, transparent 1px calc(100% / 40));
+  transition: opacity 220ms linear;
 }
-.lcd.is-on .lcd-grid { opacity: 0.14; }
 
-.controls {
+.billboard.is-on { opacity: 1; }
+
+.billboard p,
+.billboard h1 {
+  margin: 0;
+  overflow: hidden;
+  line-height: 1;
+}
+
+.billboard [data-slide] {
+  display: block;
+  transform: translate3d(0, 132%, 0);
+  transition:
+    transform 620ms var(--ease-out),
+    opacity 320ms linear;
+  opacity: 0;
+}
+
+.billboard.is-on [data-slide] {
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+}
+
+.billboard.is-on .bb-title [data-slide]  { transition-delay: 70ms; }
+.billboard.is-on .bb-artist [data-slide] { transition-delay: 150ms; }
+.billboard.is-on .bb-meta [data-slide]   { transition-delay: 215ms; }
+
+.bb-side {
+  padding-bottom: 0.9vmin;
+}
+
+.bb-side [data-slide] {
+  font-family: var(--display);
+  font-size: clamp(11px, 1.72vmin, 21px);
+  letter-spacing: 0.2em;
+  color: var(--yellow);
+  background: var(--ink);
+  padding: 0.72vmin 1.5vmin 0.62vmin;
+  width: fit-content;
+  border-radius: 999px;
+}
+
+.bb-title {
+  padding: 0.6vmin 0 1.4vmin;
+}
+
+.bb-title [data-slide] {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(2rem, 7.2vmin, 6.2rem);
+  line-height: 0.94;
+  letter-spacing: -0.024em;
+  text-transform: uppercase;
+  color: var(--paper);
+  -webkit-text-stroke: max(3px, 0.52vmin) var(--ink);
+  paint-order: stroke fill;
+  text-shadow: var(--drop) calc(var(--drop) * 1.2) 0 var(--purple);
+}
+
+.bb-artist { padding-bottom: 1.15vmin; }
+
+.bb-artist [data-slide] {
+  font-family: var(--display);
+  font-size: clamp(0.8rem, 2.2vmin, 1.7rem);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--paper);
+  border: max(2px, 0.32vmin) solid var(--ink);
+  border-radius: 999px;
+  padding: 0.5vmin 1.5vmin 0.4vmin;
+  width: fit-content;
+  box-shadow: calc(var(--drop) * 0.7) calc(var(--drop) * 0.9) 0 var(--ink);
+}
+
+.bb-meta { padding-bottom: 1vmin; }
+
+.bb-meta [data-slide] {
+  font-size: clamp(9px, 1.34vmin, 15px);
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--ink);
+  background: var(--yellow);
+  border: max(2px, 0.26vmin) solid var(--ink);
+  border-radius: 999px;
+  padding: 0.5vmin 1.3vmin 0.4vmin;
+  width: fit-content;
+}
+
+/* ==================================================================
+ * 트랜스포트 — 턴테이블 밑에 붙은 조작판
+ * ================================================================ */
+
+.transport {
   position: absolute;
-  left: 8%;
-  bottom: 8%;
+  left: 5vmin;
+  bottom: 4.6vmin;
+  z-index: 20;
   display: flex;
   align-items: center;
-  gap: clamp(18px, 2.2vw, 34px);
+  gap: 1.5vmin;
+  padding: 2vmin 2.4vmin;
+  transform: rotate(11deg);
+  transform-origin: 20% 50%;
 }
-.dpad {
-  position: relative;
-  width: clamp(34px, 4vw, 58px);
-  aspect-ratio: 1;
-}
-.dpad i {
+
+.transport-plate {
   position: absolute;
-  border: 1.2px solid var(--line);
-  background: var(--surface);
+  inset: 0;
+  z-index: -1;
+  border-radius: 999px;
+  background: var(--teal);
+  border: var(--edge) solid var(--ink);
+  box-shadow: calc(var(--drop) * 0.9) calc(var(--drop) * 1.4) 0 var(--purple-deep),
+              calc(var(--drop) * 0.9) calc(var(--drop) * 1.4) 0 var(--edge) var(--ink);
 }
-.dpad i:first-child { left: 36%; top: 0; width: 28%; height: 100%; }
-.dpad i:last-child { left: 0; top: 36%; width: 100%; height: 28%; }
-.control-key {
+
+.tkey {
+  position: relative;
+  width: 7vmin;
+  height: 7vmin;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  border: var(--edge) solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
   display: grid;
   place-items: center;
-  width: clamp(25px, 3.2vw, 44px);
-  aspect-ratio: 1;
-  border: 1.2px solid var(--line);
-  border-radius: 50%;
-  font-size: clamp(7px, 0.7vw, 11px);
+  box-shadow: 0 calc(var(--drop) * 0.9) 0 var(--ink);
+  transition:
+    transform 140ms var(--ease-snap),
+    box-shadow 140ms var(--ease-snap),
+    background-color 180ms linear;
 }
-.key-b { transform: translateY(9px); }
 
-.vent {
+.tkey svg {
+  width: 54%;
+  height: 54%;
+  fill: var(--ink);
+  stroke: var(--ink);
+  stroke-width: 2.2;
+  stroke-linejoin: round;
+}
+
+.tkey svg path[d^="M8"],
+.tkey svg path[d^="M7"],
+.tkey svg path[d^="M17"] { fill: var(--ink); }
+
+.tkey-play {
+  width: 9.4vmin;
+  height: 9.4vmin;
+  min-width: 46px;
+  min-height: 46px;
+  background: var(--yellow);
+}
+
+.tkey:hover { background: var(--yellow); }
+.tkey-play:hover { background: var(--paper); }
+
+.tkey:active,
+.tkey.is-hit {
+  transform: translateY(calc(var(--drop) * 0.9));
+  box-shadow: 0 0 0 var(--ink);
+}
+
+.tkey:focus-visible {
+  outline: none;
+  box-shadow: 0 calc(var(--drop) * 0.9) 0 var(--ink), 0 0 0 max(3px, 0.5vmin) var(--purple);
+}
+
+.tkey[disabled] {
+  opacity: 0.34;
+  cursor: not-allowed;
+  box-shadow: 0 calc(var(--drop) * 0.9) 0 var(--ink);
+}
+
+.tkey.is-live { background: var(--purple); }
+.tkey.is-live svg { fill: var(--paper); stroke: var(--paper); }
+
+/* ==================================================================
+ * 안내문
+ * ================================================================ */
+
+.cue {
   position: absolute;
-  right: 7%;
-  bottom: 8%;
-  display: flex;
-  gap: clamp(5px, 0.55vw, 9px);
-  height: 13%;
-  transform: skewX(-13deg);
+  left: 50%;
+  bottom: 2.6vmin;
+  transform: translateX(-50%);
+  margin: 0;
+  z-index: 20;
+  font-size: clamp(9px, 1.3vmin, 14px);
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--ink);
+  background: var(--paper);
+  border: var(--edge) solid var(--ink);
+  border-radius: 999px;
+  padding: 0.85vmin 2.2vmin 0.75vmin;
+  white-space: nowrap;
+  box-shadow: 0 calc(var(--drop) * 0.8) 0 var(--ink);
+  transition: opacity 240ms linear, transform 380ms var(--ease-out);
 }
-.vent i { width: 1px; height: 100%; background: var(--line); }
 
-.port-label {
-  position: absolute;
-  right: 4.5%;
-  top: 64.5%;
-  font-size: clamp(5px, 0.48vw, 8px);
-  letter-spacing: 0.12em;
-}
+.cue.is-hidden { opacity: 0; transform: translateX(-50%) translateY(1.4vmin); }
 
-.led {
-  position: absolute;
-  left: 69%;
-  top: 17.5%;
-  width: clamp(7px, 0.7vw, 10px);
-  aspect-ratio: 1;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: transparent;
-  transition: background-color 180ms ease;
-}
-.led.is-on { background: var(--ink); }
+/* ==================================================================
+ * 화면 안 — 바늘이 앉고 5초 뒤의 인터랙션
+ * ================================================================ */
 
-/* ---- 날아가는 칩 -------------------------------------------------- */
-
-.flight {
+.visual {
   position: fixed;
   inset: 0;
-  z-index: 40;
-  pointer-events: none;
-}
-
-/* ---- 화면 안 ------------------------------------------------------ */
-
-.play {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
+  z-index: 60;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 200ms ease;
-}
-.play.is-on { opacity: 1; pointer-events: auto; }
-
-.play canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
+  transition: opacity 760ms var(--ease-out);
   touch-action: none;
 }
 
-.play-hud {
+.visual.is-on { opacity: 1; pointer-events: auto; }
+
+.visual canvas {
   position: absolute;
-  left: 4.4vw;
-  bottom: 5vh;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.visual-frame { position: absolute; inset: 2.2vmin; pointer-events: none; }
+
+.vf {
+  position: absolute;
+  width: 5.4vmin;
+  height: 5.4vmin;
+  border: var(--edge) solid var(--ink);
+}
+
+.vf-tl { left: 0; top: 0; border-right: 0; border-bottom: 0; }
+.vf-tr { right: 0; top: 0; border-left: 0; border-bottom: 0; }
+.vf-bl { left: 0; bottom: 0; border-right: 0; border-top: 0; }
+.vf-br { right: 0; bottom: 0; border-left: 0; border-top: 0; }
+
+.visual-hud {
+  position: absolute;
+  left: 4.4vmin;
+  top: 4.4vmin;
   pointer-events: none;
-  color: var(--play-ink, #111);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55vmin;
+  transform: rotate(-3deg);
 }
-.play-title {
-  margin: 0 0 0.7em;
-  font-family: var(--serif);
-  font-size: clamp(22px, 2.4vw, 42px);
-  line-height: 1;
+
+.visual-hud p { margin: 0; }
+
+.vh-side {
+  font-family: var(--display);
+  font-size: clamp(10px, 1.5vmin, 16px);
+  letter-spacing: 0.2em;
+  color: var(--yellow);
+  background: var(--ink);
+  padding: 0.55vmin 1.2vmin 0.45vmin;
+  border-radius: 999px;
 }
-.play-hint {
-  margin: 0;
-  font-size: clamp(9px, 0.68vw, 12px);
+
+.vh-title {
+  font-family: var(--display);
+  font-size: clamp(1.1rem, 3.3vmin, 2.7rem);
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+  -webkit-text-stroke: max(2px, 0.32vmin) var(--ink);
+  paint-order: stroke fill;
+}
+
+.vh-artist {
+  font-size: clamp(9px, 1.36vmin, 15px);
   font-weight: 700;
-  letter-spacing: 0.16em;
-  opacity: 0.5;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--ink);
+  background: var(--paper);
+  border: max(2px, 0.28vmin) solid var(--ink);
+  border-radius: 999px;
+  padding: 0.5vmin 1.2vmin 0.4vmin;
 }
 
-.eject {
+.vh-hint {
   position: absolute;
-  right: clamp(18px, 3vw, 44px);
-  top: clamp(18px, 3vw, 44px);
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  padding: 0 0 3px;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--play-ink, #111) 5%, transparent);
-  color: var(--play-ink, #111);
-  font-family: Arial, sans-serif;
-  font-size: 28px;
-  font-weight: 300;
-  line-height: 1;
-  cursor: pointer;
-  opacity: 0.7;
-  transition: opacity 140ms ease, background-color 140ms ease, transform 100ms ease;
-}
-.eject:active { transform: scale(0.96); }
-@media (hover: hover) and (pointer: fine) {
-  .eject:hover {
-    opacity: 1;
-    background: color-mix(in srgb, var(--play-ink, #111) 10%, transparent);
-  }
-}
-
-/* ---- 작은 화면 ---------------------------------------------------- */
-
-@media (max-width: 720px) {
-  :root {
-    --card-w: clamp(190px, 58vw, 250px);
-    --deck-w: clamp(320px, 94vw, 480px);
-  }
-  .deck { left: 3vw; top: 28%; }
-  .rail { left: 70%; top: 69%; }
-  .console-mark span,
-  .bezel::before { display: none; }
-}
-
-/* 자 — clamp() 는 계산된 문자열로만 읽히므로 실제 길이를 재서 쓴다.
-   확대되는 .stage 밖(body)에 두어야 확대 중에도 값이 흔들리지 않는다. */
-.probe {
-  position: absolute;
-  left: -9999px;
-  top: 0;
-  width: var(--card-w);
-  height: 1px;
+  left: 50%;
+  bottom: 4.6vmin;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: clamp(9px, 1.28vmin, 14px);
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  color: var(--ink);
+  background: var(--paper);
+  border: max(2px, 0.28vmin) solid var(--ink);
+  border-radius: 999px;
+  padding: 0.7vmin 1.8vmin 0.6vmin;
+  white-space: nowrap;
   pointer-events: none;
 }
-.probe-cart { width: var(--cart-w); height: 1px; }
 
-/* ---- 손에 닿는 느낌 ------------------------------------------------
-   칩의 자리는 script 가 매 프레임 .chip 에 쓴다. 그래서 눌림과 들림은
-   안쪽 .face 에 얹는다 — 서로 덮어쓰지 않는다. */
-
-@media (hover: hover) and (pointer: fine) {
-  .chip.is-focus:hover .face { transform: translateX(-6px); }
+.vh-meter {
+  position: absolute;
+  right: 4.4vmin;
+  bottom: 4.6vmin;
+  display: flex;
+  align-items: center;
+  gap: 1vmin;
+  pointer-events: none;
 }
-.chip.is-focus:active .face { transform: scale(0.97); }
+
+.vh-meter em {
+  font-style: normal;
+  font-size: clamp(9px, 1.28vmin, 14px);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--ink);
+  background: var(--paper);
+  border: max(2px, 0.28vmin) solid var(--ink);
+  border-radius: 999px;
+  padding: 0.55vmin 1.2vmin 0.45vmin;
+}
+
+.vh-needle {
+  width: 2.4vmin;
+  height: 2.4vmin;
+  min-width: 12px;
+  min-height: 12px;
+  border-radius: 50%;
+  background: var(--ink);
+  border: max(2px, 0.28vmin) solid var(--paper);
+  box-shadow: 0 0 0 max(2px, 0.28vmin) var(--ink);
+}
+
+.lift {
+  position: absolute;
+  right: 4.4vmin;
+  top: 4.4vmin;
+  display: flex;
+  align-items: baseline;
+  gap: 0.9vmin;
+  padding: 1.1vmin 1.9vmin 0.95vmin;
+  border-radius: 999px;
+  border: var(--edge) solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: clamp(9px, 1.32vmin, 14px);
+  letter-spacing: 0.2em;
+  box-shadow: 0 calc(var(--drop) * 0.8) 0 var(--ink);
+  transition: transform 140ms var(--ease-snap), box-shadow 140ms var(--ease-snap), background-color 160ms linear;
+}
+
+.lift small { font-size: 0.78em; opacity: 0.55; letter-spacing: 0.14em; }
+.lift:hover { background: var(--yellow); }
+.lift:active { transform: translateY(calc(var(--drop) * 0.8)); box-shadow: 0 0 0 var(--ink); }
+
+/* ==================================================================
+ * 좁은 화면 — 구도를 세로로 눕힌다
+ * ================================================================ */
+
+@media (max-width: 860px), (max-aspect-ratio: 5/6) {
+  :root { --rd: 34vmin; }
+
+  /* 세로 화면에서는 데크를 더 깊이 잘라 넣는다. 그래야 거치대에 쉬는
+     톤암이 가운데로 나온 판 위까지 뻗지 않는다. */
+  .deck { left: -34vmin; top: -18vmin; width: 100vmin; }
+  #anchor-spot { left: 52%; top: 58%; }
+  #anchor-crate-head { left: 101%; top: 14%; }
+  #anchor-crate-tail { left: 82%; top: 116%; }
+
+  .billboard { left: 5%; top: 68%; width: 84%; }
+  .transport { left: 50%; bottom: 3.4vmin; transform: translateX(-50%) rotate(0deg); transform-origin: 50% 50%; }
+  .cue { bottom: 19vmin; font-size: 9px; letter-spacing: 0.16em; }
+  .masthead { left: 4vmin; top: 2.4vmin; }
+  .vh-hint { bottom: 12vmin; }
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .face { transition: none; }
+  .billboard [data-slide],
+  .tt-arm,
+  .room,
+  .visual,
+  .tkey,
+  .lift { transition-duration: 1ms !important; }
 }

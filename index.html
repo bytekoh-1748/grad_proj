@@ -3,80 +3,101 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>CRAFT BOY — Interaction Cartridges</title>
+  <title>HOT WAX — Pop Art Turntable</title>
+  <meta name="theme-color" content="#FFC20E" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Quantico:ital,wght@0,400;0,700;1,400&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Quantico:wght@400;700&display=swap" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- 방 — 선반(칩)과 게임기가 함께 서 있는 자리 -->
-  <div class="room" id="room">
 
-    <!-- 확대의 주체 — 여기만 화면 안으로 밀려 들어간다 -->
-    <div class="stage" id="stage">
+<!-- ================================================================
+     무대 — 노란 종이 한 장 위에 턴테이블과 판 상자가 놓인다
+     ================================================================ -->
+<main class="room" id="room">
 
-      <!-- 칩 — 오른쪽에서 파일 인덱스처럼 겹친다 -->
-      <div class="rail" id="rail" role="listbox" aria-label="Interaction cartridges" tabindex="0"></div>
+  <header class="masthead" aria-hidden="true">
+    <span class="masthead-mark">HOT WAX</span>
+    <span class="masthead-sub">PRESSING No.06 · 33⅓ RPM</span>
+  </header>
 
-      <!-- 도크 — 왼쪽에 놓인 선화형 게임기. 카트리지는 오른쪽 옆면으로 들어간다 -->
-      <div class="deck" id="deck">
-        <div class="seat" id="seat" aria-hidden="true"></div>
+  <!-- 턴테이블 — 왼쪽 위, 기울어져 화면 밖으로 잘린다 -->
+  <div class="deck" id="deck-base"><span class="platter-mark" id="platter-mark" aria-hidden="true"></span></div>
 
-        <div class="console" id="console">
-          <span class="console-inset" aria-hidden="true"></span>
-          <span class="screw screw-nw" aria-hidden="true"></span>
-          <span class="screw screw-ne" aria-hidden="true"></span>
-          <span class="screw screw-sw" aria-hidden="true"></span>
-          <span class="screw screw-se" aria-hidden="true"></span>
+  <!-- 톤암은 판보다 위층에 산다 — 바늘이 홈에 얹혀야 하므로 -->
+  <div class="deck deck-top" id="deck-arm"></div>
 
-          <div class="console-mark" aria-hidden="true">
-            <strong>CRAFT BOY</strong>
-            <span>INTERACTION DRIVE / MODEL 06</span>
-          </div>
-
-          <span class="port-guide" aria-hidden="true"></span>
-          <span class="slot" aria-hidden="true"></span>
-
-          <div class="bezel">
-            <div class="lcd" id="lcd">
-              <canvas id="lcd-cv"></canvas>
-              <span class="lcd-grid" aria-hidden="true"></span>
-            </div>
-          </div>
-
-          <div class="controls" aria-hidden="true">
-            <span class="dpad"><i></i><i></i></span>
-            <span class="control-key key-a">A</span>
-            <span class="control-key key-b">B</span>
-          </div>
-
-          <div class="vent" aria-hidden="true">
-            <i></i><i></i><i></i><i></i><i></i><i></i>
-          </div>
-          <span class="port-label" aria-hidden="true">SIDE LOAD / PUSH ←</span>
-          <span class="led" id="led" aria-hidden="true"></span>
-        </div>
-      </div>
-    </div>
-
+  <!-- 트랜스포트 — 턴테이블 밑에 붙은 조작판 -->
+  <div class="transport" id="transport" role="group" aria-label="Transport controls">
+    <button class="tkey" data-act="prev" type="button" aria-label="Previous record">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14M20 5 9 12l11 7Z"/></svg>
+    </button>
+    <button class="tkey tkey-play" data-act="play" type="button" aria-label="Play">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4 20 12 6 20Z"/></svg>
+    </button>
+    <button class="tkey" data-act="pause" type="button" aria-label="Pause">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v16M16 4v16"/></svg>
+    </button>
+    <button class="tkey" data-act="stop" type="button" aria-label="Stop">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="5.5" width="13" height="13" rx="1.5"/></svg>
+    </button>
+    <button class="tkey" data-act="next" type="button" aria-label="Next record">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5v14M4 5l11 7L4 19Z"/></svg>
+    </button>
+    <span class="transport-plate" aria-hidden="true"></span>
   </div>
 
-  <!-- 날아가는 칩 한 장이 잠시 머무는 층 -->
-  <div class="flight" id="flight" aria-hidden="true"></div>
+  <!-- 대각선 타이포 — 판이 가운데 앉는 순간 비스듬히 밀려 들어온다 -->
+  <div class="billboard" id="billboard" aria-live="polite">
+    <p class="bb-side"><span data-slide>A1</span></p>
+    <h1 class="bb-title"><span data-slide></span></h1>
+    <p class="bb-artist"><span data-slide></span></p>
+    <p class="bb-meta"><span data-slide></span></p>
+  </div>
 
-  <!-- 화면 안 — 확대가 끝나면 여기서 인터랙션이 돈다 -->
-  <section class="play" id="play" aria-hidden="true">
-    <canvas id="play-cv"></canvas>
-    <div class="play-hud">
-      <p class="play-title" id="play-title"></p>
-      <p class="play-hint" id="play-hint"></p>
-    </div>
-    <button class="eject" id="eject" type="button" aria-label="Close interaction">×</button>
-  </section>
+  <!-- 자리표 — 레이아웃은 CSS 가 정하고, 스크립트는 재기만 한다 -->
+  <span class="anchor" id="anchor-spot" aria-hidden="true"></span>
+  <span class="anchor" id="anchor-crate-head" aria-hidden="true"></span>
+  <span class="anchor" id="anchor-crate-tail" aria-hidden="true"></span>
 
-  <script type="module" src="script.js"></script>
+  <!-- 판 상자 — 오른쪽에서 대각선으로 겹쳐 서고, 고른 한 장이 여기서 날아간다 -->
+  <div class="records" id="records" role="listbox" aria-label="Record crate" tabindex="0"></div>
+
+  <p class="cue" id="cue">SCROLL OR DRAG THE CRATE · CLICK A RECORD TO CUE</p>
+</main>
+
+<!-- ================================================================
+     바늘이 홈에 앉고 5초 뒤 — 곡의 인터랙션이 화면을 넘겨받는다
+     ================================================================ -->
+<section class="visual" id="visual" aria-hidden="true">
+  <canvas id="visual-cv"></canvas>
+
+  <div class="visual-frame" aria-hidden="true">
+    <span class="vf vf-tl"></span><span class="vf vf-tr"></span>
+    <span class="vf vf-bl"></span><span class="vf vf-br"></span>
+  </div>
+
+  <div class="visual-hud">
+    <p class="vh-side" id="vh-side">A1</p>
+    <p class="vh-title" id="vh-title"></p>
+    <p class="vh-artist" id="vh-artist"></p>
+  </div>
+
+  <p class="vh-hint" id="vh-hint"></p>
+
+  <div class="vh-meter" aria-hidden="true">
+    <span class="vh-needle" id="vh-needle"></span>
+    <em id="vh-bpm">92 BPM</em>
+  </div>
+
+  <button class="lift" id="lift" type="button">
+    <span>LIFT THE ARM</span><small>ESC</small>
+  </button>
+</section>
+
+<script type="module" src="script.js"></script>
 </body>
 </html>
