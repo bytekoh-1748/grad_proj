@@ -1,4 +1,3 @@
-import { POP } from './config.js';
 import { labelArt } from './label-art.js';
 
 /* ==================================================================
@@ -50,6 +49,7 @@ function grooves() {
  * @param {boolean} [options.sleeve]  뒤에 종이 재킷을 한 장 깔지 여부
  */
 export function buildRecord(track, { sleeve = false } = {}) {
+  const P = track.palette;
   serial += 1;
   const clip = `label-clip-${serial}`;
   const wedges = track.wedges
@@ -64,20 +64,20 @@ export function buildRecord(track, { sleeve = false } = {}) {
       <defs>
         <clipPath id="${clip}"><circle cx="100" cy="100" r="${R_LABEL - 7}"/></clipPath>
       </defs>
-      ${sleeve ? `<rect x="2" y="2" width="196" height="196" rx="4" fill="${track.label.paper}" stroke="${POP.black}" stroke-width="4"/>` : ''}
+      ${sleeve ? `<rect x="2" y="2" width="196" height="196" rx="4" fill="${track.label.paper}" stroke="${P.ink}" stroke-width="4"/>` : ''}
       <g class="record-spin">
-        <circle cx="100" cy="100" r="${R_OUT}" fill="${POP.black}"/>
+        <circle cx="100" cy="100" r="${R_OUT}" fill="${P.ink}"/>
         ${wedges}
         ${grooves()}
-        <circle cx="100" cy="100" r="${R_OUT}" fill="none" stroke="${POP.black}" stroke-width="4"/>
-        <circle cx="100" cy="100" r="${R_LABEL}" fill="${POP.white}" stroke="${POP.black}" stroke-width="4.5"/>
+        <circle cx="100" cy="100" r="${R_OUT}" fill="none" stroke="${P.ink}" stroke-width="4"/>
+        <circle cx="100" cy="100" r="${R_LABEL}" fill="${P.paper}" stroke="${P.ink}" stroke-width="4.5"/>
         <g clip-path="url(#${clip})">
           <g transform="translate(${100 - (R_LABEL - 7)} ${100 - (R_LABEL - 7)}) scale(${((R_LABEL - 7) * 2) / 100})">
-            ${labelArt(track.label.art)}
+            ${labelArt(track.label.art, P)}
           </g>
         </g>
-        <circle cx="100" cy="100" r="${R_LABEL - 7}" fill="none" stroke="${POP.black}" stroke-width="3"/>
-        <circle cx="100" cy="100" r="4.6" fill="${POP.black}"/>
+        <circle cx="100" cy="100" r="${R_LABEL - 7}" fill="none" stroke="${P.ink}" stroke-width="3"/>
+        <circle cx="100" cy="100" r="4.6" fill="${P.ink}"/>
       </g>
     </svg>`;
   el.querySelector('.record-spin').dataset.spin = '';

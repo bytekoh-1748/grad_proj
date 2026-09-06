@@ -1,10 +1,27 @@
-import { clamp, lerp, POP, TAU } from '../config.js';
+import { clamp, lerp, TAU } from '../config.js';
 import { registerTrack } from './registry.js';
+
+/* 이 판의 레이블, 색 쐐기, 방과 인터랙션이 함께 쓰는 잉크. */
+const P = Object.freeze({
+  name: 'SOLAR POP',
+  wash: '#FF942B',
+  ground: '#FFB51B',
+  ink: '#0D0D0D',
+  paper: '#FFFFFF',
+  primary: '#F43F29',
+  primaryDeep: '#B5201C',
+  secondary: '#7B2FEA',
+  secondaryDeep: '#4D12A6',
+  accent: '#FFE12B',
+  accentDeep: '#F0AD00',
+  soft: '#FF88AD',
+});
 
 const eye = { x: 0.5, y: 0.5 };
 
 registerTrack({
   id: 'sun-machine',
+  palette: P,
   side: 'B1',
   title: 'Sun Machine',
   artist: 'Orange Parade',
@@ -12,9 +29,9 @@ registerTrack({
   duration: '3:51',
   bpm: 112,
   hint: 'MOVE TO SWING THE SUN',
-  wedges: [[20, 70, POP.yellow], [110, 160, POP.purple], [200, 250, POP.teal], [290, 340, POP.yellow]],
-  label: { art: 'sunburst', paper: POP.yellow },
-  scene: { ground: POP.yellow, ink: POP.purple },
+  wedges: [[20, 70, P.accent], [110, 160, P.primary], [200, 250, P.secondary], [290, 340, P.accent]],
+  label: { art: 'sunburst', paper: P.accent },
+  scene: { ground: P.ground, ink: P.accent },
 
   render({ context: g, width: W, height: H, time, beat, pulse, pointer, dt }) {
     const s = Math.min(W, H);
@@ -34,7 +51,7 @@ registerTrack({
     for (let i = 0; i < rays; i += 1) {
       const a0 = spin + (i / rays) * TAU;
       const a1 = a0 + (TAU / rays) * (0.5 + pulse * 0.08);
-      g.fillStyle = i % 2 ? POP.purple : POP.teal;
+      g.fillStyle = i % 2 ? P.primary : P.secondary;
       g.globalAlpha = i % 2 ? 0.95 : 0.9;
       g.beginPath();
       g.moveTo(cx, cy);
@@ -48,7 +65,7 @@ registerTrack({
     /* 하프톤 — 해에서 멀어질수록 점이 굵어진다 */
     const cell = s * 0.052;
     const far = Math.hypot(W, H) * 0.66;
-    g.fillStyle = POP.yellow;
+    g.fillStyle = P.accent;
     for (let y = cell * 0.5; y < H + cell; y += cell) {
       for (let x = cell * 0.5; x < W + cell; x += cell) {
         const offset = (Math.round(y / cell) % 2) * cell * 0.5;
@@ -64,15 +81,15 @@ registerTrack({
 
     /* 해의 속 — 흰 원, 노란 원, 그리고 박자에 부푸는 테두리 */
     const core = s * (0.11 + pulse * 0.022);
-    g.fillStyle = POP.white;
-    g.strokeStyle = POP.black;
+    g.fillStyle = P.paper;
+    g.strokeStyle = P.ink;
     g.lineWidth = line * 1.6;
     g.beginPath();
     g.arc(cx, cy, core, 0, TAU);
     g.fill();
     g.stroke();
 
-    g.fillStyle = POP.yellow;
+    g.fillStyle = P.accent;
     g.beginPath();
     g.arc(cx, cy, core * 0.6, 0, TAU);
     g.fill();
@@ -81,7 +98,7 @@ registerTrack({
 
     /* 눈 — 해가 이쪽을 본다 */
     const look = core * 0.16;
-    g.fillStyle = POP.black;
+    g.fillStyle = P.ink;
     [-1, 1].forEach((side) => {
       g.beginPath();
       g.ellipse(
@@ -95,7 +112,7 @@ registerTrack({
       );
       g.fill();
     });
-    g.strokeStyle = POP.black;
+    g.strokeStyle = P.ink;
     g.lineWidth = line;
     g.lineCap = 'round';
     g.beginPath();

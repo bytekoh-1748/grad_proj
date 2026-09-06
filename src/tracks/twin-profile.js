@@ -1,12 +1,29 @@
-import { clamp, POP, TAU } from '../config.js';
+import { clamp, TAU } from '../config.js';
 import { FACE_PROFILE } from '../label-art.js';
 import { registerTrack } from './registry.js';
 
+/* 이 판의 레이블, 색 쐐기, 방과 인터랙션이 함께 쓰는 잉크. */
+const P = Object.freeze({
+  name: 'CORAL DUET',
+  wash: '#12BFC4',
+  ground: '#12BFC4',
+  ink: '#0D0D0D',
+  paper: '#FFFFFF',
+  primary: '#3955F5',
+  primaryDeep: '#2436AA',
+  secondary: '#FF6253',
+  secondaryDeep: '#C82D38',
+  accent: '#FFD533',
+  accentDeep: '#EDA400',
+  soft: '#FF95BA',
+});
+
 /* 레이블에 붙은 옆얼굴과 같은 윤곽. 0..100 상자 안에서 오른쪽을 본다. */
-const facePath = new Path2D(FACE_PROFILE);
+const facePath = FACE_PROFILE;
 
 registerTrack({
   id: 'twin-profile',
+  palette: P,
   side: 'A3',
   title: 'Twin Profile',
   artist: 'Duo Mirage',
@@ -14,9 +31,9 @@ registerTrack({
   duration: '5:04',
   bpm: 104,
   hint: 'DRAG TO PULL THE PLATES APART',
-  wedges: [[0, 90, POP.teal], [90, 180, POP.purple], [270, 360, POP.yellow]],
-  label: { art: 'profiles', paper: POP.teal },
-  scene: { ground: POP.teal, ink: POP.purple },
+  wedges: [[0, 90, P.secondary], [90, 180, P.primary], [270, 360, P.accent]],
+  label: { art: 'profiles', paper: P.secondary },
+  scene: { ground: P.ground, ink: P.accent },
 
   render({ context: g, width: W, height: H, time, beat, pulse, pointer }) {
     const s = Math.min(W, H);
@@ -32,11 +49,11 @@ registerTrack({
     const drop = clamp(pointer.dy, -1, 1) * s * 0.045;
 
     /* 뒤로 깔리는 노란 원 — 두 얼굴이 서 있는 자리 */
-    g.fillStyle = POP.yellow;
+    g.fillStyle = P.accent;
     g.beginPath();
     g.arc(cx, cy, s * (0.4 + pulse * 0.012), 0, TAU);
     g.fill();
-    g.strokeStyle = POP.black;
+    g.strokeStyle = P.ink;
     g.lineWidth = line * 1.4;
     g.stroke();
 
@@ -65,7 +82,7 @@ registerTrack({
       g.fillStyle = fill;
       g.fill(facePath);
       if (outline) {
-        g.strokeStyle = POP.black;
+        g.strokeStyle = P.ink;
         g.lineWidth = line / unit;
         g.lineJoin = 'round';
         g.stroke(facePath);
@@ -74,18 +91,18 @@ registerTrack({
     };
 
     /* 어긋나 찍힌 색판 — 본판보다 조금 밀려 앉는다 */
-    drawFace(-1, s * 0.026, -drop, POP.purpleDeep, false);
-    drawFace(1, s * 0.026, drop, POP.purpleDeep, false);
-    drawFace(-1, s * 0.013, -drop * 0.5, POP.white, false);
-    drawFace(1, s * 0.013, drop * 0.5, POP.white, false);
+    drawFace(-1, s * 0.026, -drop, P.primaryDeep, false);
+    drawFace(1, s * 0.026, drop, P.primaryDeep, false);
+    drawFace(-1, s * 0.013, -drop * 0.5, P.paper, false);
+    drawFace(1, s * 0.013, drop * 0.5, P.paper, false);
 
     /* 본판 */
-    drawFace(-1, 0, 0, POP.white, true);
-    drawFace(1, 0, 0, POP.purple, true);
+    drawFace(-1, 0, 0, P.paper, true);
+    drawFace(1, 0, 0, P.primary, true);
 
     /* 두 얼굴 사이의 틈 — 벌어질수록 검은 기둥이 선다 */
     if (gap > s * 0.02) {
-      g.fillStyle = POP.black;
+      g.fillStyle = P.ink;
       g.fillRect(cx - line * 0.4, cy - unit * 48, line * 0.8, unit * 92);
     }
   },

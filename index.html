@@ -1,103 +1,89 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>HOT WAX — Pop Art Turntable</title>
-  <meta name="theme-color" content="#FFC20E" />
-
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Quantico:wght@400;700&display=swap" />
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#ffc20e">
+  <title>MY ROOM — Your own pace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-<!-- ================================================================
-     무대 — 노란 종이 한 장 위에 턴테이블과 판 상자가 놓인다
-     ================================================================ -->
-<main class="room" id="room">
-
-  <header class="masthead" aria-hidden="true">
-    <span class="masthead-mark">HOT WAX</span>
-    <span class="masthead-sub">PRESSING No.06 · 33⅓ RPM</span>
-  </header>
-
-  <!-- 턴테이블 — 왼쪽 위, 기울어져 화면 밖으로 잘린다 -->
-  <div class="deck" id="deck-base"><span class="platter-mark" id="platter-mark" aria-hidden="true"></span></div>
-
-  <!-- 톤암은 판보다 위층에 산다 — 바늘이 홈에 얹혀야 하므로 -->
-  <div class="deck deck-top" id="deck-arm"></div>
-
-  <!-- 트랜스포트 — 턴테이블 밑에 붙은 조작판 -->
-  <div class="transport" id="transport" role="group" aria-label="Transport controls">
-    <button class="tkey" data-act="prev" type="button" aria-label="Previous record">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14M20 5 9 12l11 7Z"/></svg>
-    </button>
-    <button class="tkey tkey-play" data-act="play" type="button" aria-label="Play">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4 20 12 6 20Z"/></svg>
-    </button>
-    <button class="tkey" data-act="pause" type="button" aria-label="Pause">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4v16M16 4v16"/></svg>
-    </button>
-    <button class="tkey" data-act="stop" type="button" aria-label="Stop">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5.5" y="5.5" width="13" height="13" rx="1.5"/></svg>
-    </button>
-    <button class="tkey" data-act="next" type="button" aria-label="Next record">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5v14M4 5l11 7L4 19Z"/></svg>
-    </button>
-    <span class="transport-plate" aria-hidden="true"></span>
-  </div>
-
-  <!-- 대각선 타이포 — 판이 가운데 앉는 순간 비스듬히 밀려 들어온다 -->
-  <div class="billboard" id="billboard" aria-live="polite">
-    <p class="bb-side"><span data-slide>A1</span></p>
-    <h1 class="bb-title"><span data-slide></span></h1>
-    <p class="bb-artist"><span data-slide></span></p>
-    <p class="bb-meta"><span data-slide></span></p>
-  </div>
-
-  <!-- 자리표 — 레이아웃은 CSS 가 정하고, 스크립트는 재기만 한다 -->
-  <span class="anchor" id="anchor-spot" aria-hidden="true"></span>
-  <span class="anchor" id="anchor-crate-head" aria-hidden="true"></span>
-  <span class="anchor" id="anchor-crate-tail" aria-hidden="true"></span>
-
-  <!-- 판 상자 — 오른쪽에서 대각선으로 겹쳐 서고, 고른 한 장이 여기서 날아간다 -->
-  <div class="records" id="records" role="listbox" aria-label="Record crate" tabindex="0"></div>
-
-  <p class="cue" id="cue">SCROLL OR DRAG THE CRATE · CLICK A RECORD TO CUE</p>
+<main id="room" class="room" data-view="home" data-activity="home" data-state="loading">
+  <svg id="stage" class="stage" viewBox="0 0 1600 900" aria-label="움직이는 팝아트 리스닝 룸">
+    <defs>
+      <clipPath id="floor-clip"><path id="floor-clip-path"/></clipPath>
+      <pattern id="dots-dense" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="2.8" fill="var(--ink)"/></pattern>
+      <pattern id="dots-mid" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.8" fill="var(--ink)"/></pattern>
+      <pattern id="dots-light" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r=".8" fill="var(--ink)"/></pattern>
+      <pattern id="hatch" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M0 12 12 0" stroke="var(--ink)" stroke-width="1.2" opacity=".5"/></pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="var(--wall-paper)"/>
+    <g id="drawing">
+      <path id="floor" fill="var(--wash)"/>
+      <g id="wall-light" fill="#fffbe4" aria-hidden="true">
+        <path id="wall-light-0"/><path id="wall-light-1"/><path id="wall-light-2"/><path id="wall-light-3"/>
+      </g>
+      <path id="boundary-2" fill="url(#dots-light)"/>
+      <path id="boundary-1" fill="url(#dots-mid)"/>
+      <path id="boundary-0" fill="url(#dots-dense)"/>
+      <path id="floor-hatching" fill="url(#hatch)"/>
+      <path id="seam" fill="none" stroke="var(--ink)" stroke-width="2" opacity=".8"/>
+      <path id="seam-inner" fill="none" stroke="var(--ink)" stroke-width="1" opacity=".4"/>
+      <g id="floor-light" clip-path="url(#floor-clip)" fill="#fffbe4" aria-hidden="true">
+        <path id="floor-light-0"/><path id="floor-light-1"/><path id="floor-light-2"/><path id="floor-light-3"/>
+      </g>
+      <g id="activity-shadows" aria-hidden="true"/>
+      <g id="activity-edges" aria-hidden="true"/>
+      <g id="record-shadows" aria-hidden="true"/>
+      <g id="deck-sides" aria-hidden="true"/>
+      <g id="deck-base" data-deck="true" aria-hidden="true"/>
+    </g>
+  </svg>
+  <div id="activity-layer" class="activity-layer"></div>
+  <div id="track-plane" class="track-plane"><svg viewBox="0 0 1000 600" width="1000" height="600" overflow="hidden" aria-label="벽에 비치는 LP 애니메이션"><g id="track-drawing"/></svg></div>
+  <div id="record-layer" class="record-layer" role="group" aria-label="겹쳐 놓인 LP"></div>
+  <svg id="arm-overlay" class="arm-overlay" viewBox="0 0 1600 900" aria-hidden="true"><g id="arm-drawing"><g id="arm-shadow"/><g id="deck-arm"/></g></svg>
+  <section id="billboard" class="billboard" aria-label="선택한 LP와 재생 조작">
+    <div id="title-copy">
+      <h1 id="track-title" class="bb-title">MIDNIGHT<br>ROTATION</h1>
+      <p id="track-artist" class="bb-artist">THE VELVET LOOP</p>
+    </div>
+    <div class="transport" role="group" aria-label="재생 조작">
+      <button data-act="prev" type="button" aria-label="이전 LP"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M19 5 8 12l11 7Z"/></svg></button>
+      <button data-act="play" class="play-key" type="button" aria-label="재생" aria-pressed="false"><svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 4 14 8-14 8Z"/></svg><svg class="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg></button>
+      <button data-act="stop" type="button" aria-label="정지" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1"/></svg></button>
+      <button data-act="next" type="button" aria-label="다음 LP"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M5 5l11 7-11 7Z"/></svg></button>
+      <span id="track-meta" class="track-meta">4:12<br>92 BPM</span>
+    </div>
+  </section>
+  <footer class="room-controls">
+    <button id="go-home" class="home-key" type="button" hidden>← 방으로</button>
+    <span id="home-caption" class="home-caption">MY ROOM <span>·</span> YOUR OWN PACE.</span>
+    <nav aria-label="구도" class="view-controls">
+      <button data-view="listen" aria-pressed="true">사선</button>
+      <button data-view="room" aria-pressed="false">넓게</button>
+      <button data-view="deck" aria-pressed="false">반대편</button>
+      <button data-view="wall" aria-pressed="false">벽 쪽</button>
+    </nav>
+    <div class="daylight-controls">
+      <label for="light-time">빛 <output id="light-readout" for="light-time">13:00</output></label>
+      <input id="light-time" type="range" min="7" max="19" step=".02" value="13" aria-label="빛의 시간">
+      <button id="light-auto" type="button" aria-pressed="true" title="장면 속 빛의 시간을 흘려보내기">흐름</button>
+    </div>
+    <p id="room-hint" class="sr-only">LP를 골라 재생해 보세요</p>
+    <div class="zoom-controls" role="group" aria-label="화면 크기">
+      <button data-zoom="out" aria-label="작게 보기">−</button>
+      <button data-zoom="in" aria-label="크게 보기">+</button>
+    </div>
+  </footer>
+  <p class="sr-only" id="live-status" role="status"></p>
+  <div id="loading" class="loading"><span class="loading-disc"></span><p>색판을 펼치고 있어요.</p></div>
+  <div id="room-error" class="room-error" hidden><p>화면을 불러오지 못했어요.</p><button id="reload">다시 불러오기</button></div>
 </main>
-
-<!-- ================================================================
-     바늘이 홈에 앉고 5초 뒤 — 곡의 인터랙션이 화면을 넘겨받는다
-     ================================================================ -->
-<section class="visual" id="visual" aria-hidden="true">
-  <canvas id="visual-cv"></canvas>
-
-  <div class="visual-frame" aria-hidden="true">
-    <span class="vf vf-tl"></span><span class="vf vf-tr"></span>
-    <span class="vf vf-bl"></span><span class="vf vf-br"></span>
-  </div>
-
-  <div class="visual-hud">
-    <p class="vh-side" id="vh-side">A1</p>
-    <p class="vh-title" id="vh-title"></p>
-    <p class="vh-artist" id="vh-artist"></p>
-  </div>
-
-  <p class="vh-hint" id="vh-hint"></p>
-
-  <div class="vh-meter" aria-hidden="true">
-    <span class="vh-needle" id="vh-needle"></span>
-    <em id="vh-bpm">92 BPM</em>
-  </div>
-
-  <button class="lift" id="lift" type="button">
-    <span>LIFT THE ARM</span><small>ESC</small>
-  </button>
-</section>
-
+<dialog id="article-reader" class="article-reader" aria-labelledby="article-title"><div class="reader-toolbar"><span class="article-tag"></span><button id="close-article" aria-label="기사 닫기">닫기 ×</button></div><h2 id="article-title"></h2><div class="article-body"></div></dialog>
 <script type="module" src="script.js"></script>
 </body>
 </html>

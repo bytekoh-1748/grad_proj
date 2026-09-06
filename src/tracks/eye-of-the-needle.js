@@ -1,8 +1,25 @@
-import { clamp, POP, TAU } from '../config.js';
+import { clamp, TAU } from '../config.js';
 import { registerTrack } from './registry.js';
+
+/* 이 판의 레이블, 색 쐐기, 방과 인터랙션이 함께 쓰는 잉크. */
+const P = Object.freeze({
+  name: 'ACID DAYDREAM',
+  wash: '#CAED27',
+  ground: '#CAED27',
+  ink: '#0D0D0D',
+  paper: '#FFFFFF',
+  primary: '#FF3D94',
+  primaryDeep: '#B31563',
+  secondary: '#2458F4',
+  secondaryDeep: '#1735A5',
+  accent: '#FFE132',
+  accentDeep: '#E6AC00',
+  soft: '#FF95C6',
+});
 
 registerTrack({
   id: 'eye-of-the-needle',
+  palette: P,
   side: 'A2',
   title: 'Eye of the Needle',
   artist: 'Suzi & The Static',
@@ -10,9 +27,9 @@ registerTrack({
   duration: '3:28',
   bpm: 124,
   hint: 'MOVE TO BE LOOKED AT',
-  wedges: [[34, 128, POP.teal], [186, 232, POP.purple], [300, 348, POP.yellow]],
-  label: { art: 'eye', paper: POP.yellow },
-  scene: { ground: POP.yellow, ink: POP.purple },
+  wedges: [[34, 128, P.secondary], [186, 232, P.primary], [300, 348, P.accent]],
+  label: { art: 'eye', paper: P.accent },
+  scene: { ground: P.ground, ink: P.accent },
 
   render({ context: g, width: W, height: H, time, beat, pulse, pointer }) {
     const s = Math.min(W, H);
@@ -21,7 +38,7 @@ registerTrack({
     const line = Math.max(3, s * 0.013);
 
     /* 박자마다 바깥으로 퍼지는 고리 */
-    g.strokeStyle = POP.purple;
+    g.strokeStyle = P.primary;
     for (let i = 0; i < 4; i += 1) {
       const age = (beat - i) % 4;
       if (age < 0) continue;
@@ -56,7 +73,7 @@ registerTrack({
     });
 
     /* 속눈썹 — 눈꺼풀 바깥으로 뻗는다. 박자에 맞춰 길이가 숨 쉰다. */
-    g.strokeStyle = POP.purple;
+    g.strokeStyle = P.primary;
     g.lineCap = 'round';
     [[-1, 11], [1, 7]].forEach(([side, count]) => {
       for (let i = 1; i <= count; i += 1) {
@@ -77,15 +94,15 @@ registerTrack({
     /* 어긋나 찍힌 청록 판 — 팝아트의 오프셋 */
     g.save();
     g.translate(s * 0.012, s * 0.014);
-    g.fillStyle = POP.teal;
+    g.fillStyle = P.secondary;
     almond();
     g.fill();
     g.restore();
 
-    g.fillStyle = POP.white;
+    g.fillStyle = P.paper;
     almond();
     g.fill();
-    g.strokeStyle = POP.black;
+    g.strokeStyle = P.ink;
     g.lineWidth = line * 1.5;
     g.stroke();
 
@@ -99,7 +116,7 @@ registerTrack({
     const iy = cy + clamp((pointer.y - 0.5) * 2.4, -1, 1) * reach * 0.42;
     const ir = s * (0.115 + pulse * 0.012);
 
-    g.fillStyle = POP.teal;
+    g.fillStyle = P.secondary;
     g.beginPath();
     g.arc(ix, iy, ir, 0, TAU);
     g.fill();
@@ -115,7 +132,7 @@ registerTrack({
       g.stroke();
     }
 
-    g.strokeStyle = POP.black;
+    g.strokeStyle = P.ink;
     g.lineWidth = line * 1.2;
     g.beginPath();
     g.arc(ix, iy, ir, 0, TAU);
@@ -123,25 +140,25 @@ registerTrack({
 
     /* 동공 — 누르면 조인다 */
     const pr = ir * (pointer.down ? 0.26 : 0.44 - pulse * 0.06);
-    g.fillStyle = POP.black;
+    g.fillStyle = P.ink;
     g.beginPath();
     g.arc(ix, iy, pr, 0, TAU);
     g.fill();
 
-    g.fillStyle = POP.white;
+    g.fillStyle = P.paper;
     g.beginPath();
     g.arc(ix - ir * 0.34, iy - ir * 0.36, ir * 0.16, 0, TAU);
     g.fill();
     g.restore();
 
     /* 위 눈꺼풀 선 */
-    g.strokeStyle = POP.black;
+    g.strokeStyle = P.ink;
     g.lineWidth = line * 1.5;
     almond();
     g.stroke();
 
     /* 눈썹 — 눈 위로 한 획 */
-    g.strokeStyle = POP.purple;
+    g.strokeStyle = P.primary;
     g.lineWidth = line * 2.2;
     g.lineCap = 'round';
     g.beginPath();

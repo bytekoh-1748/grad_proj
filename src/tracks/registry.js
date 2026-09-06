@@ -37,6 +37,10 @@ export function registerTrack(definition) {
   requireText(definition.label && definition.label.paper, 'label.paper', id);
   requireText(definition.scene && definition.scene.ground, 'scene.ground', id);
   requireText(definition.scene && definition.scene.ink, 'scene.ink', id);
+  ['name', 'wash', 'ground', 'ink', 'paper', 'primary', 'primaryDeep',
+    'secondary', 'secondaryDeep', 'accent', 'accentDeep', 'soft'].forEach((field) => {
+    requireText(definition.palette && definition.palette[field], `palette.${field}`, id);
+  });
 
   if (!Number.isFinite(definition.bpm) || definition.bpm <= 0) {
     throw new TypeError(`Track "${id}" requires a positive bpm.`);
@@ -52,6 +56,7 @@ export function registerTrack(definition) {
     wedges: Object.freeze(definition.wedges.map((slice) => Object.freeze([...slice]))),
     label: Object.freeze({ ...definition.label }),
     scene: Object.freeze({ ...definition.scene }),
+    palette: Object.freeze({ ...definition.palette }),
   });
 
   registry.push(track);
