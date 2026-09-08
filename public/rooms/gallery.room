@@ -1,0 +1,15 @@
+// ROOM / gallery — an unfinished personal exhibition
+room "gallery"
+title "Collected,\nnever completed."
+composition "graphic"
+palette "paper"
+surface {"width":50,"depth":24,"wall":true}
+light {"color":"#fff0ce","intensity":3,"cycle":"still"}
+shader {"pattern":"grain","strength":0.12,"speed":0.35,"code":""}
+
+// at [horizontal, layer, vertical] · rotate [tilt, angle, tilt]
+// relief 0–0.65: depth within the printed image
+object "camera-1" camera {"at":[-2,0.5,-1],"rotate":[0,-5,0],"scale":1.65,"color":"#edff52","material":"clay","relief":0.32,"action":"gallery","content":"photos","motion":"float"}
+object "book-1" book {"at":[5,0.7,1],"rotate":[0,-7,0],"scale":1.15,"color":"#edff52","material":"clay","relief":0.18,"action":"article","content":"empty-time"}
+object "lamp-1" lamp {"at":[-7,0,3],"rotate":[0,8,0],"scale":0.82,"color":"#ff5635","material":"clay","relief":0.34,"action":"light","motion":"none"}
+object "portal-1" portal {"at":[5,0.8,-4.5],"rotate":[0,4,0],"scale":1.03,"color":"#edff52","material":"clay","relief":0.4,"action":"room","content":"master"}

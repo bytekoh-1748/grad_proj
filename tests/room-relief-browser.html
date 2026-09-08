@@ -1,0 +1,73 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23252ce5'/%3E%3C/svg%3E"><title>ROOM relief integration checks</title><style>@font-face{font-family:'Uncut Sans';src:url('/fonts/UncutSans-Variable.woff2');font-weight:100 900}body{margin:0;background:#111;color:#eee;font:14px monospace}#probe{width:640px;height:480px}pre{white-space:pre-wrap}</style></head><body><div id="probe"></div><pre id="result">Running…</pre><script type="module">
+import * as THREE from 'three';
+import {makeObject,disposeObject,refreshWidget} from '../src/editor/models.js';
+import {RoomRenderer} from '../src/editor/renderer.js';
+import {KINDS,WIDGETS,widgetSize} from '../src/editor/widget-catalog.js';
+import {parseRoom} from '../src/editor/room-code.js';
+import {INITIAL_ROOMS} from '../src/editor/templates.js';
+const assert=(condition,message)=>{if(!condition)throw Error(message);};
+try {
+  await document.fonts.load('700 30px "Uncut Sans"');
+  const world=new RoomRenderer(document.querySelector('#probe'));world.reduced=true;world.apply(parseRoom(INITIAL_ROOMS[0].source).scene);
+  const step=t=>{cancelAnimationFrame(world.frame);world.tick(t);};
+  const gl=world.renderer.getContext();const scene=new THREE.Scene();scene.background=new THREE.Color('#121212');
+  const camera=new THREE.PerspectiveCamera(46,1,.1,50);camera.up.set(0,0,-1);camera.position.set(2,8,1.5);camera.lookAt(0,0,0);
+  const artwork=makeObject('camera','#edff52','clay',0);scene.add(artwork);const target=new THREE.WebGLRenderTarget(256,256);const uniform=artwork.getObjectByName('relief').material.uniforms.uDepth;
+  const read=()=>{const out=new Uint8Array(256*256*4);world.renderer.setRenderTarget(target);world.renderer.render(scene,camera);world.renderer.readRenderTargetPixels(target,0,0,256,256,out);world.renderer.setRenderTarget(null);return out;};
+  const flat=read();uniform.value=.4;const relief=read();let changed=0,delta=0;for(let i=0;i<flat.length;i+=4){const d=Math.abs(flat[i]-relief[i])+Math.abs(flat[i+1]-relief[i+1])+Math.abs(flat[i+2]-relief[i+2]);if(d>20)changed++;delta+=d;}
+  assert(changed>1200,'Depth map must change interior pixels on the same flat plane');assert(artwork.getObjectByName('relief').geometry.getAttribute('position').count===4,'Artwork geometry must remain one 2D quad');assert(gl.getError()===gl.NO_ERROR,'GPU shader compile/render/readback must succeed');
+  world.flyTo({position:[90,-4,90],target:[0,0,0],fov:90},true);world.pointerMove({clientX:9999,clientY:9999});step(performance.now()+16);assert(world.camera.position.y>=world.baseHeight*.62,'Camera cannot pass behind a poster');assert(Math.abs(world.camera.position.x-world.target.x)<=1.4,'Camera yaw must remain bounded');
+  world.setMode(true);world.home(true);world.reduced=false;const stillView=world.camera.position.clone();world.pointerMove({clientX:640,clientY:0});for(let i=0;i<80;i++)step(performance.now()+16+i);assert(world.camera.position.equals(stillView),'Hovering alone must leave the view still');
+  world.setMode(false);world.home(true);world.pointerMove({clientX:640,clientY:0});for(let i=0;i<80;i++)step(performance.now()+100+i);assert(world.camera.position.x>.8&&Math.abs(world.camera.position.x-world.target.x)<=1.4,'Viewing mode restores the original hover parallax');
+  world.pointerDown({button:2,clientX:630,clientY:10});assert(!world.viewDrag&&!world.drag,'Viewing mode does not use editor right-drag controls');let prevented=false;const visitCamera=world.cameraState();world.wheel({clientX:630,clientY:10,deltaY:100,preventDefault(){prevented=true;}});assert(!prevented&&JSON.stringify(world.cameraState())===JSON.stringify(visitCamera),'Viewing mode retains its original wheel behavior');
+  world.reduced=true;world.home(true);world.pointerMove({clientX:640,clientY:0});step(performance.now()+200);assert(world.camera.position.x===world.target.x,'Reduced motion suppresses viewing parallax');world.setMode(true);world.home(true);
+  world.reduced=true;const time=world.time;step(performance.now()+100);step(performance.now()+200);assert(world.time===time,'Reduced motion freezes time');
+  world.setMode(true);world.setTool('direct');world.select('camera-1');const g=world.objects.get('camera-1'),start=g.position.clone();world.drag={g,start:start.clone(),point:new THREE.Vector3(),rotation:g.rotation.y,scale:g.scale.x};g.position.x+=5;world.cancelDrag();assert(g.position.equals(start),'Cancel restores the original placement');
+  const data=parseRoom(INITIAL_ROOMS[0].source).scene;data.objects=[{...data.objects[0],at:[0,0,0],rotate:[0,17,0],scale:1.4}];world.apply(data);world.home(true);step(performance.now()+250);
+  const mesh=world.objects.get('camera-1').getObjectByName('relief'),bounds=mesh.geometry.parameters;
+  const point=(u,v)=>{const p=mesh.localToWorld(new THREE.Vector3((u-.5)*bounds.width,(v-.5)*bounds.height,0)).project(world.camera),rect=world.host.getBoundingClientRect();return {clientX:rect.left+(p.x+1)*rect.width/2,clientY:rect.top+(1-p.y)*rect.height/2};};
+  assert(world.pick(point(.004,.996))===null,'Transparent frame margin must not capture a click');
+  assert(world.pick(point(.25,.32))?.userData.id==='camera-1','Visible image window remains clickable after rotation');
+  // Desktop left drag only moves; right drag rotates without translating.
+  const edits=[];world.onTransform=(id,patch)=>edits.push({id,patch});world.onSelect=id=>world.select(id);
+  const item=world.objects.get('camera-1'),initialPosition=item.position.clone(),originalRotation=item.rotation.y,pickPoint=point(.25,.32);
+  world.setTool('rotate');world.pointerDown({...pickPoint,button:0,pointerType:'mouse'});world.pointerMove({clientX:pickPoint.clientX+26,clientY:pickPoint.clientY+12});assert(item.rotation.y===originalRotation&&!item.position.equals(initialPosition),'Left mouse remains move-only even with rotation selected');world.cancelDrag();
+  world.setTool('direct');world.pointerDown({...pickPoint,button:2,pointerType:'mouse'});world.pointerMove({clientX:pickPoint.clientX+75,clientY:pickPoint.clientY});assert(item.position.equals(initialPosition)&&Math.abs(item.rotation.y-originalRotation-.45)<.001,'Right drag rotates only');world.pointerUp({clientX:pickPoint.clientX+75,clientY:pickPoint.clientY});assert(edits.length===1&&edits[0].id==='camera-1','Right drag commits exactly once');world.apply(data);step(performance.now()+260);edits.length=0;
+  const wheelEvent={...point(.25,.32),deltaY:-10,deltaMode:0,preventDefault(){}};
+  world.wheel(wheelEvent);world.wheel(wheelEvent);world.wheel(wheelEvent);assert(edits.length===0,'Wheel events stay in one live edit');await new Promise(resolve=>setTimeout(resolve,260));assert(edits.length===1&&Math.abs(edits[0].patch.relief-(data.objects[0].relief+.045))<.001,'A scroll burst commits one depth edit');world.apply(data);edits.length=0;
+  for(let i=0;i<20;i++)world.wheel({...wheelEvent,deltaY:-100});assert(world.wheelEdit.value===.65,'Depth upper limit is enforced');world.cancelDrag();await new Promise(resolve=>setTimeout(resolve,260));assert(edits.length===0,'Escape cancels scroll without a delayed commit');
+  for(let i=0;i<20;i++)world.wheel({...wheelEvent,deltaY:100});assert(world.wheelEdit.value===0,'Depth lower limit is enforced');world.cancelDrag();
+  world.setMode(true,true);world.wheel(wheelEvent);assert(!world.wheelEdit,'Dirty code blocks wheel edits');world.pointerDown({...pickPoint,button:2,pointerType:'mouse'});assert(!world.drag,'Dirty code blocks right-drag edits');world.setMode(true,false);
+  world.home(true);const blank={clientX:world.host.getBoundingClientRect().left+4,clientY:world.host.getBoundingClientRect().top+4},viewBefore=world.camera.position.clone();assert(!world.pick(blank),'View test starts on empty background');
+  world.pointerDown({...blank,button:2});world.pointerMove({clientX:blank.clientX+200,clientY:blank.clientY+160});step(performance.now()+270);assert(world.camera.position.x!==viewBefore.x&&Math.abs(world.camera.position.x-world.target.x)<=1.4,'Right drag tilts within the view limit');world.cancelDrag();assert(world.camera.position.equals(viewBefore),'Escape restores view drag');
+  for(let i=0;i<20;i++)world.wheel({...blank,deltaY:-100,deltaMode:0,preventDefault(){}});assert((world.viewTarget||world.cameraState()).position[1]===world.baseHeight*.62,'Background wheel zoom is cumulative and bounded');world.home(true);step(performance.now()+275);
+  // An invisible part of a front cutout must let a visible object behind it receive the hit.
+  data.objects.push({...data.objects[0],id:'lamp-front',kind:'lamp',at:[0,1,0],rotate:[0,17,0],scale:1.4});world.apply(data);step(performance.now()+280);
+  const front=world.objects.get('lamp-front').getObjectByName('relief'),size=front.geometry.parameters,edge=front.localToWorld(new THREE.Vector3(.499*size.width,0,0)).project(world.camera),r=world.host.getBoundingClientRect();assert(world.pick({clientX:r.left+(edge.x+1)*r.width/2,clientY:r.top+(1-edge.y)*r.height/2})?.userData.id==='camera-1','Clicks pass through transparent margins of the foreground widget');
+  world.select('camera-1');const selected=world.objects.get('camera-1'),pose=world.frameFor('camera-1'),rect=world.host.getBoundingClientRect(),cx=pose.center.x+rect.left,cy=pose.center.y+rect.top,initialAngle=selected.rotation.y,initialScale=selected.scale.x;
+  assert(!world.beginHandle({button:0,pointerType:'mouse',clientX:cx,clientY:cy-100},'rotate'),'Mouse handles reject the left button');
+  assert(world.beginHandle({button:2,clientX:cx,clientY:cy-100},'rotate'),'Rotation handle starts');world.pointerMove({clientX:cx+100,clientY:cy});assert(Math.abs(selected.rotation.y-initialAngle+Math.PI/2)<.001,'Rotation follows the pointer angle around the object');world.cancelDrag();assert(selected.rotation.y===initialAngle,'Cancel restores handle rotation');
+  world.reduced=false;world.camera.position.x+=.5;const frozen=world.camera.position.clone();assert(world.beginHandle({button:2,clientX:cx+100,clientY:cy},'scale'),'Scale handle starts');const radius=world.drag.radius,center=world.drag.center;world.pointerMove({clientX:center.x+radius*1.5,clientY:center.y});step(performance.now()+300);assert(Math.abs(selected.scale.x-initialScale*1.5)<.001,'Scale follows the distance from the object center');assert(world.camera.position.equals(frozen),'Camera stays still while using a transform handle');world.cancelDrag();assert(selected.scale.x===initialScale,'Cancel restores handle scale');
+  assert(world.beginHandle({button:0,pointerType:'touch',clientX:cx+100,clientY:cy},'scale'),'Touch handles remain available without a secondary mouse button');world.cancelDrag();
+  const cutouts={};for(const kind of KINDS)for(const {id:variant} of WIDGETS[kind].variants){
+    const item=makeObject(kind,WIDGETS[kind].color,'clay',.24,'',variant),mesh=item.getObjectByName('relief'),map=mesh.userData.pickMap;let transparent=0,solid=0;
+    for(let i=3;i<map.alpha.length;i+=4){if(map.alpha[i]===0)transparent++;if(map.alpha[i]>230)solid++;}
+    assert(transparent>map.width*map.height*.03&&solid>map.width*map.height*.3,`${kind}/${variant} must retain transparent surrounding space and solid content`);
+    const [w,h]=widgetSize(kind,variant);assert(mesh.geometry.parameters.width===w&&mesh.geometry.parameters.height===h,`${kind}/${variant} uses the design's actual dimensions`);
+    scene.add(item);read();scene.remove(item);assert(gl.getError()===gl.NO_ERROR,`${kind}/${variant} renders without GPU errors`);cutouts[kind+'/'+variant]='pass';disposeObject(item);
+  }
+  // Actual silhouette holes and circular corners must not intercept a hit on the poster behind.
+  world.reduced=true;const back={...data.objects[0],at:[0,0,0],rotate:[0,0,0],scale:1.4};
+  const cutout={...back,id:'shape-front',kind:'clock',variant:'dial',at:[0,.6,0],scale:1};
+  data.objects=[back,cutout];world.apply(data);world.home(true);step(performance.now()+320);
+  const shapePoint=(u,v)=>{const mesh=world.objects.get('shape-front').getObjectByName('relief'),s=mesh.geometry.parameters,p=mesh.localToWorld(new THREE.Vector3((u-.5)*s.width,(v-.5)*s.height,0)).project(world.camera),r=world.host.getBoundingClientRect();return {clientX:r.left+(p.x+1)*r.width/2,clientY:r.top+(1-p.y)*r.height/2};};
+  assert(world.pick(shapePoint(.07,.93))?.userData.id==='camera-1','Round corner passes through to the image behind');
+  assert(world.pick(shapePoint(.5,.5))?.userData.id==='shape-front','Circular clock center remains selectable');
+  data.objects[1]={...cutout,kind:'turntable',variant:'vinyl'};world.apply(data);step(performance.now()+340);
+  assert(world.pick(shapePoint(.5,1-464/(1000*4.2/3.7)))?.userData.id==='camera-1','The record center hole passes clicks to the image behind');
+  const clock=makeObject('clock','#c2b3ed','clay',.24,'','dial'),later=new Date(Date.now()+120000),clockGeometry=clock.getObjectByName('relief').geometry;
+  assert(refreshWidget(clock,later),'Clock refreshes after the minute changes');assert(!refreshWidget(clock,later),'Clock does not redraw within the same minute');assert(clock.getObjectByName('relief').geometry===clockGeometry&&clock.userData.variant==='dial','Clock refresh retains the chosen silhouette and geometry');disposeObject(clock);
+  const result={pass:true,widgetClockRefresh:'pass',silhouettePicking:'pass',designCount:Object.keys(cutouts).length,changedReliefPixels:changed,totalPixels:65536,averageRGBDifference:+(delta/65536/3).toFixed(2),planeVertices:4,cameraBounds:'pass',reducedMotion:'pass',cancelDrag:'pass',cutoutPicking:'pass',transformHandles:'pass',gestureCameraFreeze:'pass',visitHoverEditManual:'pass',rightDragAndWheel:'pass',wheelBurstUndo:'pass',inputCancellation:'pass',leftMoveOnly:'pass',cutouts,gpuError:gl.getError()};
+  disposeObject(artwork);target.dispose();world.destroy();window.__roomQA=result;document.querySelector('#result').textContent=JSON.stringify(result,null,2);
+} catch(error){window.__roomQA={pass:false,error:error.stack};document.querySelector('#result').textContent=error.stack;console.error(error);}
+</script></body></html>

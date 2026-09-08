@@ -1,99 +1,64 @@
 <!doctype html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#ffc20e">
-  <title>ROOM — Your own pace</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Quantico:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="editions.css">
-</head>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><meta name="theme-color" content="#252ce5"><meta name="description" content="좋아하는 것들로 채우는 나만의 공간. 오브제와 코드로 만드는 ROOM."><title>ROOM — An unfinished exhibition</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='9' fill='%232b3729'/%3E%3Ctext x='8' y='30' font-size='30' fill='%23dfeb96' font-family='sans-serif'%3ER%3C/text%3E%3C/svg%3E"><link rel="stylesheet" href="/src/editor/studio.css"><link rel="stylesheet" href="/src/editor/floating-studio.css"></head>
 <body>
-<main id="room" class="room" data-view="home" data-activity="home" data-state="loading">
-  <svg id="stage" class="stage" viewBox="0 0 1600 900" aria-label="빛과 물체가 움직이는 방">
-    <defs>
-      <radialGradient id="ambient-a"><stop stop-color="var(--art-a)" stop-opacity=".85"/><stop offset=".5" stop-color="var(--art-a)" stop-opacity=".25"/><stop offset="1" stop-color="var(--art-a)" stop-opacity="0"/></radialGradient>
-      <radialGradient id="ambient-b"><stop stop-color="var(--art-b)" stop-opacity=".7"/><stop offset=".55" stop-color="var(--art-c)" stop-opacity=".15"/><stop offset="1" stop-color="var(--art-b)" stop-opacity="0"/></radialGradient>
-      <linearGradient id="material-sheen" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".65"/><stop offset=".3" stop-color="#fff" stop-opacity=".03"/><stop offset=".65" stop-color="#fff" stop-opacity=".04"/><stop offset=".85" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity=".08"/></linearGradient>
-      <filter id="soft-light" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="9"/></filter>
-      <clipPath id="floor-clip"><path id="floor-clip-path"/></clipPath>
-      <pattern id="dots-dense" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="2.8" fill="var(--ink)"/></pattern>
-      <pattern id="dots-mid" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.8" fill="var(--ink)"/></pattern>
-      <pattern id="dots-light" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r=".8" fill="var(--ink)"/></pattern>
-      <pattern id="hatch" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M0 12 12 0" stroke="var(--ink)" stroke-width="1.2" opacity=".5"/></pattern>
-    </defs>
-    <rect width="100%" height="100%" fill="var(--wall-paper)"/>
-    <g id="drawing">
-      <path id="floor" fill="var(--wash)"/><g id="edition-floor-art" aria-hidden="true" clip-path="url(#floor-clip)"/>
-      <g id="floor-surface" aria-hidden="true" clip-path="url(#floor-clip)"/>
-      <g id="wall-light" fill="#fffbe4" aria-hidden="true">
-        <path id="wall-light-0"/><path id="wall-light-1"/><path id="wall-light-2"/><path id="wall-light-3"/>
-      </g>
-      <path id="boundary-2" fill="url(#dots-light)"/>
-      <path id="boundary-1" fill="url(#dots-mid)"/>
-      <path id="boundary-0" fill="url(#dots-dense)"/>
-      <path id="floor-hatching" fill="url(#hatch)"/>
-      <path id="seam" fill="none" stroke="var(--ink)" stroke-width="2" opacity=".8"/>
-      <path id="seam-inner" fill="none" stroke="var(--ink)" stroke-width="1" opacity=".4"/>
-      <g id="floor-light" clip-path="url(#floor-clip)" fill="#fffbe4" aria-hidden="true">
-        <path id="floor-light-0"/><path id="floor-light-1"/><path id="floor-light-2"/><path id="floor-light-3"/>
-      </g>
-      <g id="activity-shadows" aria-hidden="true"/>
-      <g id="activity-edges" aria-hidden="true"/>
-      <g id="record-shadows" aria-hidden="true"/>
-      <g id="deck-sides" aria-hidden="true"/>
-      <g id="deck-base" data-deck="true" aria-hidden="true"/><path id="deck-material" fill="url(#material-sheen)" pointer-events="none"/>
-    </g>
-  </svg>
-  <div id="activity-layer" class="activity-layer"></div>
-  <div id="track-plane" class="track-plane"><svg viewBox="0 0 1000 600" width="1000" height="600" overflow="hidden" aria-label="벽에 비치는 LP 애니메이션"><g id="track-drawing"/></svg></div>
-  <div id="record-layer" class="record-layer" role="group" aria-label="겹쳐 놓인 LP"></div>
-  <svg id="arm-overlay" class="arm-overlay" viewBox="0 0 1600 900" aria-hidden="true"><g id="arm-drawing"><g id="arm-shadow"/><g id="deck-arm"/></g></svg>
-  <section id="billboard" class="billboard" aria-label="선택한 LP와 재생 조작">
-    <div id="title-copy">
-      <h1 id="track-title" class="bb-title">MIDNIGHT<br>ROTATION</h1>
-      <p id="track-artist" class="bb-artist">THE VELVET LOOP</p>
-    </div>
-    <div class="transport" role="group" aria-label="재생 조작">
-      <button data-act="prev" type="button" aria-label="이전 LP"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M19 5 8 12l11 7Z"/></svg></button>
-      <button data-act="play" class="play-key" type="button" aria-label="재생" aria-pressed="false"><svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 4 14 8-14 8Z"/></svg><svg class="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg></button>
-      <button data-act="stop" type="button" aria-label="정지" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1"/></svg></button>
-      <button data-act="next" type="button" aria-label="다음 LP"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M5 5l11 7-11 7Z"/></svg></button>
-      <span id="track-meta" class="track-meta">4:12<br>92 BPM</span>
-    </div>
-  </section>
-  <button id="go-home" class="home-key" type="button" hidden>← 방으로</button>
-  <span id="home-caption" class="home-caption">ROOM / YOUR OWN PACE.</span>
-  <button id="space-toggle" class="space-toggle" type="button" aria-label="공간 조절" aria-expanded="false" aria-controls="space-controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M9 4v6m6 4v6"/></svg></button>
-  <section id="space-controls" class="room-controls" aria-label="공간 조절" hidden>
-    <div class="space-panel-title"><span>공간 조절 <small id="palette-name">Citrus</small></span><button id="close-space" aria-label="공간 조절 닫기">×</button></div>
-    <nav aria-label="구도" class="view-controls">
-      <button data-view="listen" aria-pressed="true">사선</button>
-      <button data-view="room" aria-pressed="false">넓게</button>
-      <button data-view="deck" aria-pressed="false">반대편</button>
-      <button data-view="wall" aria-pressed="false">벽 쪽</button>
+<div id="app" data-mode="visit" data-mobile-panel="space">
+<header class="app-header"><div class="room-brand"><a class="room-wordmark" href="/" aria-label="ROOM 홈">ROOM <span aria-hidden="true">✳</span></a><span class="brand-caption">AN UNFINISHED<br>EXHIBITION</span></div><div class="header-room"><span id="room-name">master.room</span><span class="header-studio"> / OPEN STUDIO</span></div><div class="space-actions"><button id="panel-toggle" title="도구 창 정리" aria-label="도구 창 정리">⌑</button><button id="mode-button" class="dark-button">편집 ↗</button></div></header>
+<main class="workspace">
+<section id="space-panel" aria-label="공간" class="space-panel">
+<div id="scene" class="scene"></div><div id="scene-loading"><span>ROOM</span></div>
+<div class="scene-meta"><span id="scene-index">01 / PERSONAL EXHIBITION</span><time id="local-time"></time></div>
+<div class="scene-direction" aria-hidden="true">NO RIGHT<br>WAY UP.<span>↗</span></div>
+<div class="scene-caption"><h1 id="space-title">Everything in<br>its wrong place.</h1><p>이미지, 소리, 문장. 나를 이루는 조각들.</p><span class="scene-figure">FIG. 001 — THE DESKTOP IS A LANDSCAPE</span></div>
+<p class="scene-colophon">↗ OPEN SOMETHING<br>LEAVE SOMETHING ↗</p>
+<div class="view-toolbar" aria-label="구도 도구"><button id="home-view" title="기본 구도 (H)" aria-label="기본 구도로 복귀">⌂</button><button id="focus-view" title="선택 오브제로 이동 (F)" aria-label="선택 오브제로 이동">⊙</button><button id="top-view" title="평면으로 보기" aria-label="평면으로 보기">▱</button><span></span><button id="zoom-in" aria-label="확대">＋</button><button id="zoom-out" aria-label="축소">−</button></div>
+<div id="selection-overlay" hidden>
+<svg class="selection-drawing" aria-hidden="true"><polygon id="selection-outline"/><path id="rotation-stem"/><path id="selection-corners"/></svg>
+<button id="rotate-handle" class="transform-handle rotation-handle" aria-label="선택 오브제 회전 손잡이" title="오른쪽 드래그로 회전 · 방향키로 5°">⟳</button>
+<button id="scale-handle" class="transform-handle scale-handle" aria-label="선택 오브제 크기 손잡이" title="오른쪽 드래그로 크기 조절 · 방향키로 0.1">⤢</button>
+<div id="selection-tag" class="selection-tag"><span></span><output id="transform-readout"></output></div>
+<div class="edit-toolbar" aria-label="선택 오브제 도구"><button data-tool="direct" aria-pressed="true" aria-label="이동" title="이동 (G)">↖</button><button data-tool="rotate" aria-label="회전" title="오른쪽 드래그로 회전 (R)">⟳</button><button data-tool="scale" aria-label="크기" title="오른쪽 드래그로 크기 조절 (S)">⤢</button><i></i><button id="object-variants" aria-label="선택 오브제 디자인 바꾸기" title="디자인 바꾸기">◈</button><button id="open-properties" aria-label="선택 오브제 속성 열기" title="속성">⌘</button><button id="duplicate-object" aria-label="선택 오브제 복제" title="복제 (⌘D)">⧉</button><button id="delete-object" aria-label="선택 오브제 삭제" title="삭제 (Delete)">×</button></div>
+</div>
+<div class="scene-bottom"><div class="scene-feel"><button id="reduced-motion" class="motion-toggle" aria-pressed="false" aria-label="움직임 줄이기" title="움직임 줄이기">Ⅱ</button><span>마우스로 느끼고, 눌러서 열어 보세요.</span></div><button id="object-toggle" aria-expanded="false">오브제 <span id="object-count">05</span> ↗</button></div>
+<div id="object-popover" class="object-popover" hidden><div class="small-heading">오브제 <button id="object-close" aria-label="오브제 목록 닫기">×</button></div><div id="object-list"></div></div>
+</section>
+<section id="library-window" class="studio-window library-panel" data-studio-window hidden aria-label="오브제 보관함">
+<div class="studio-window-header"><button class="window-grip" data-window-drag aria-label="오브제 보관함 이동"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="6" height="6"/><rect x="14.5" y="3.5" width="6" height="6"/><rect x="3.5" y="14.5" width="6" height="6"/><path d="M17.5 13.5v8m-4-4h8"/></svg><span class="window-title">오브제</span></button><span id="library-count" class="widget-count" aria-label="위젯 종류 수">14</span><button data-window-maximize aria-label="오브제 보관함 크게 보기" title="크게 보기"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="maximize-expand" d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4"/><path class="maximize-restore" d="M8 4h12v12M4 8h12v12H4z"/></svg></button><button data-window-close aria-label="오브제 보관함 닫기" title="닫기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+<div id="library-crumb" hidden><button id="library-back" aria-label="전체 위젯 보기" title="전체 위젯">←</button><span id="library-kind-name"></span></div><div id="library" class="library" tabindex="0" role="group" aria-label="전체 위젯"></div><div class="library-footer"><label>레이어 <select id="placement-surface" aria-label="배치 표면"><option value="floor">앞 레이어</option><option value="wall">뒤 레이어</option></select></label></div></section>
+<section id="code-window" class="studio-window code-window" data-studio-window hidden aria-label="코드와 방 파일">
+  <div class="studio-window-header">
+    <button id="toggle-room-files" aria-label="방 파일 접기" title="방 파일 접기 (3)" aria-expanded="true" aria-controls="room-files" aria-keyshortcuts="3"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M9 4v16"/><path class="sidebar-fill" d="M4 5h4v14H4z"/></svg></button>
+    <button class="window-grip" data-window-drag aria-label="코드 창 이동"><span class="window-title">코드</span></button>
+    <button data-window-maximize aria-label="코드 창 크게 보기" title="크게 보기"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="maximize-expand" d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4"/><path class="maximize-restore" d="M8 4h12v12M4 8h12v12H4z"/></svg></button><button data-window-close aria-label="코드 창 닫기" title="닫기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+  </div>
+  <div class="source-workspace">
+    <nav id="room-files" class="source-files" aria-label="방 파일">
+      <div class="files-heading"><span>방 파일</span><details class="file-menu"><summary title="파일 작업" aria-label="파일 작업">···</summary><div class="file-actions"><button id="rename-room">이름 바꾸기</button><button id="download-room">방 파일 내보내기</button><button id="import-project">파일 가져오기</button><button id="export-project">프로젝트 내보내기</button></div></details></div>
+      <div id="file-list"></div>
+      <button id="new-room" aria-label="새 방 만들기" title="새 방 만들기"><span>＋</span> 새 방</button>
     </nav>
-    <div class="daylight-controls" id="light-debug" hidden>
-      <label for="light-time">시각 <output id="light-readout" for="light-time">13:00</output></label>
-      <input id="light-time" type="range" min="0" max="23.98" step=".02" value="13" aria-label="가상 시각">
-      <button id="light-auto" type="button" aria-pressed="true">현재 시각</button>
+    <div class="editor-panel" aria-label="코드 편집">
+      <div class="source-heading"><div class="source-file-title"><span id="source-number" aria-hidden="true">01</span><span id="code-filename">master.room</span></div><div class="history-actions"><button id="undo-button" title="실행 취소 (⌘Z)" aria-label="실행 취소"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4-5 5 5 5M3 9h11a6 6 0 0 1 0 12h-3"/></svg></button><button id="redo-button" title="다시 실행 (⌘⇧Z)" aria-label="다시 실행"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 4 5 5-5 5m5-5H10a6 6 0 0 0 0 12h3"/></svg></button><button id="save-button" title="저장 (⌘S)" aria-label="프로젝트 저장"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></svg></button><button id="code-help" title="코드 도움말" aria-label="코드 도움말"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4m0 3h.01"/></svg></button></div></div>
+      <div class="editor-heading"><div id="room-tabs" class="room-tabs" role="tablist" aria-label="열린 방 파일"></div><button class="inspector-toggle" data-editor-tab="properties" aria-label="속성" title="속성">⌘</button></div>
+      <div id="code-tab" class="editor-tab"><div id="code-editor"></div><div id="code-error" role="alert" hidden></div><div class="code-footer"><div class="editor-status"><span id="save-state">저장됨</span><span id="code-state">실행됨</span><span id="code-summary">01 : 01</span></div><button id="discard-draft" class="text-button" hidden>되돌리기</button><button id="run-code" class="dark-button" title="실행 (⌘ Enter)"><span>실행</span> ↗</button></div></div>
+      <div class="composition-bar"><span>구도</span><select id="composition" aria-label="구도 프리셋"><option value="floor">01 전체 콜라주</option><option value="close">02 가까이 보기</option><option value="graphic">03 넓게 보기</option></select><button id="save-camera" class="icon-button" title="현재 시점을 기본 구도로 저장" aria-label="현재 시점 저장">⊕</button><a href="/compositions.html" target="_blank" title="세 구도 비교" aria-label="세 구도 비교">↗</a></div>
     </div>
-    <p id="room-hint" class="sr-only">LP를 골라 재생해 보세요</p>
-    <div class="zoom-controls" role="group" aria-label="화면 크기">
-      <button data-zoom="out" aria-label="작게 보기">−</button>
-      <button data-zoom="in" aria-label="크게 보기">+</button>
-    </div>
-    <div id="glass-option" hidden><button id="solid-glass" aria-pressed="false">투명도 줄이기</button></div>
-  </section>
-  <p id="design-status" class="sr-only" role="status"></p>
-  <p class="sr-only" id="live-status" role="status"></p>
-  <div id="loading" class="loading"><span class="loading-disc"></span><p>색판을 펼치고 있어요.</p></div>
-  <div id="room-error" class="room-error" hidden><p>화면을 불러오지 못했어요.</p><button id="reload">다시 불러오기</button></div>
-</main>
-<dialog id="article-reader" class="article-reader" aria-labelledby="article-title"><div class="reader-toolbar"><span class="article-tag"></span><button id="close-article" aria-label="기사 닫기">닫기 ×</button></div><h2 id="article-title"></h2><div class="article-body"></div></dialog>
-<script type="module" src="script.js"></script>
-</body>
-</html>
+  </div>
+</section><section id="properties-window" class="studio-window properties-window" data-studio-window hidden aria-label="속성 창"><div class="studio-window-header"><button class="window-grip" data-window-drag aria-label="속성 창 이동"><span class="window-title">속성</span></button><button data-window-maximize aria-label="속성 창 크게 보기" title="크게 보기"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="maximize-expand" d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4"/><path class="maximize-restore" d="M8 4h12v12M4 8h12v12H4z"/></svg></button><button data-window-close aria-label="속성 창 닫기" title="닫기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div><div id="properties-tab" class="editor-tab properties"></div></section><nav class="studio-dock" aria-label="편집 도구">
+  <button data-window-toggle="library-window" aria-label="오브제 보관함" title="오브제 보관함 (1)" aria-expanded="false" aria-keyshortcuts="1"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="6" height="6"/><rect x="14.5" y="3.5" width="6" height="6"/><rect x="3.5" y="14.5" width="6" height="6"/><path d="M17.5 13.5v8m-4-4h8"/></svg></button>
+  <button data-window-toggle="code-window" aria-label="코드와 방 파일" title="코드와 방 파일 (2)" aria-expanded="false" aria-keyshortcuts="2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 6-5 6 5 6m10-12 5 6-5 6M14.5 3l-5 18"/></svg></button>
+  <i aria-hidden="true"></i>
+  <button data-history="undo" aria-label="실행 취소" title="실행 취소 (⌘Z)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4-5 5 5 5M3 9h11a6 6 0 0 1 0 12h-3"/></svg></button>
+  <button data-history="redo" aria-label="다시 실행" title="다시 실행 (⌘⇧Z)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 4 5 5-5 5m5-5H10a6 6 0 0 0 0 12h3"/></svg></button>
+  <i aria-hidden="true"></i>
+  <button id="snap-button" aria-pressed="false" aria-label="스냅" title="0.5 단위 스냅"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h5v10a3 3 0 0 0 6 0V3h5v10a8 8 0 0 1-16 0ZM4 8h5m6 0h5"/></svg></button>
+  <button id="grid-button" aria-pressed="false" aria-label="격자" title="격자"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18"/><path d="M9 3v18m6-18v18M3 9h18M3 15h18"/></svg></button>
+</nav></main>
+<footer class="app-footer"><span>A PERSONAL EXHIBITION, ALWAYS IN PROGRESS.</span><span>ROOM — VOL. 001 / 2026</span></footer>
+
+</div>
+<dialog id="content-dialog" class="content-dialog"><div class="content-heading"><div><span id="content-kicker" class="eyebrow"></span><h2 id="content-title"></h2></div><button id="close-content" class="icon-button" aria-label="콘텐츠 닫기">×</button></div><div id="content-body"></div></dialog>
+<dialog id="name-dialog" class="name-dialog"><form method="dialog"><h2 id="name-title">새 방 만들기</h2><label for="name-input">방 파일 이름</label><input id="name-input" required maxlength="64" placeholder="my-space" autocomplete="off"><span class="name-suffix">.room</span><p id="name-error" role="alert"></p><div><button value="cancel" formnovalidate>취소</button><button id="name-submit" value="ok" class="dark-button">만들기 ↗</button></div></form></dialog>
+<input id="project-file" type="file" accept=".room,.roompack,application/json" hidden><input id="media-file" type="file" accept="image/*,audio/*,video/*" multiple hidden>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script type="module" src="/src/editor/app.js"></script>
+</body></html>
