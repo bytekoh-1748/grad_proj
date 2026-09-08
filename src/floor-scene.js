@@ -19,7 +19,7 @@ export const OBJECTS = Object.freeze({
 // Only the shared floor projection changes between compositions.
 // Default rear edge follows the user's red guide: y ≈ .268x - 68.
 export const FLOOR_VIEWS = {
-  home: {floor:[-120,-150,1690,205,1510,1180,-520,825], rise:[.055,-1.05]},
+  home: {floor:[-120,-100,1690,235,1510,1090,-520,755], rise:[.055,-1.05]},
   cinema: {floor:[-240,300,1710,535,1550,1220,-660,930], rise:[.04,-1.03]},
   journal: {floor:[-150,-45,1690,245,1500,1130,-470,840], rise:[.04,-1.02]},
   listen: {floor:[-250,-135,1650,375,1300,1250,-740,740], rise:[.055,-1.05]},

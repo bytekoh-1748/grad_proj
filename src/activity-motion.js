@@ -2,9 +2,15 @@ import {mix,smooth,ContourState} from './vector-math.js';
 
 export const ACTIVITIES=['home','music','cinema','journal'];
 export const POSTERS={
-  music:{u:390,v:300,width:570,depth:490,angle:-5},
-  cinema:{u:1040,v:205,width:440,depth:340,angle:7},
-  journal:{u:1040,v:595,width:445,depth:290,angle:-5},
+  music:{u:405,v:250,width:570,depth:450,angle:0},
+  cinema:{u:1035,v:250,width:440,depth:215,angle:0},
+  journal:{u:1035,v:510,width:440,depth:215,angle:0},
+};
+// Narrow screens unfold the same floor posters into one readable column.
+export const MOBILE_POSTERS={
+  music:{u:500,v:220,width:980,depth:380,angle:0},
+  cinema:{u:500,v:645,width:980,depth:195,angle:0},
+  journal:{u:500,v:885,width:980,depth:195,angle:0},
 };
 export const MUSIC_ORIGIN={u:675,v:545};
 export const clamp=t=>Math.max(0,Math.min(1,t));

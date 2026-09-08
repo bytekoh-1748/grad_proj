@@ -19,12 +19,14 @@ export class ContourState {
   to(target) { this.target = structuredClone(target); }
   step(dt) {
     let moving = false;
+    this.changed = false;
     for (const key of Object.keys(this.value)) {
       this.value[key].forEach((value, i) => {
         const goal = this.target[key][i];
         const next = this.reduced ? [goal, 0] : spring(value, this.velocity[key][i], goal, dt);
         if (Math.abs(next[0] - goal) < .015 && Math.abs(next[1]) < .00015) { next[0] = goal; next[1] = 0; }
         this.value[key][i] = next[0];
+        this.changed ||= next[0] !== value;
         this.velocity[key][i] = next[1];
         moving ||= next[0] !== goal;
       });
@@ -59,4 +61,3 @@ export function inversePoint(m,x,y) {
   return [(m[3]*dx-m[2]*dy)/det,(-m[1]*dx+m[0]*dy)/det];
 }
 export const matrixText = m => `matrix(${m.map(n=>Number(n.toFixed(5))).join(' ')})`;
-

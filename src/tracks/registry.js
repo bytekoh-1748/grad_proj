@@ -23,6 +23,10 @@ export function registerTrack(definition) {
   ['side', 'title', 'artist', 'genre', 'duration', 'hint'].forEach((field) => {
     requireText(definition[field], field, id);
   });
+  if (!/^\d+:[0-5]\d$/.test(definition.duration)) throw new TypeError(`Track "${id}" duration must be m:ss.`);
+  const [minutes, seconds] = definition.duration.split(':').map(Number);
+  const durationMs = (minutes * 60 + seconds) * 1000;
+  if (durationMs <= 0) throw new TypeError(`Track "${id}" duration must be positive.`);
 
   if (!Array.isArray(definition.wedges) || !definition.wedges.length) {
     throw new TypeError(`Track "${id}" requires at least one vinyl wedge.`);
@@ -48,11 +52,22 @@ export function registerTrack(definition) {
   if (typeof definition.render !== 'function') {
     throw new TypeError(`Track "${id}" requires a render() function.`);
   }
+  if (definition.moods) {
+    for (const [period, mood] of Object.entries(definition.moods)) {
+      if (!['morning', 'day', 'evening', 'night'].includes(period) ||
+          !['expressive', 'liquid', 'bauhaus'].includes(mood?.edition) ||
+          !Number.isInteger(mood.palette) || mood.palette < 0 || mood.palette > 2) {
+        throw new TypeError(`Track "${id}" has an invalid mood for ${period}.`);
+      }
+    }
+  }
   if (ids.has(id)) throw new Error(`Duplicate track id: ${id}`);
   if (sides.has(definition.side)) throw new Error(`Duplicate track side: ${definition.side}`);
 
   const track = Object.freeze({
     ...definition,
+    durationMs,
+    moods: Object.freeze(Object.fromEntries(Object.entries(definition.moods ?? {}).map(([period, mood]) => [period, Object.freeze({ ...mood })]))),
     wedges: Object.freeze(definition.wedges.map((slice) => Object.freeze([...slice]))),
     label: Object.freeze({ ...definition.label }),
     scene: Object.freeze({ ...definition.scene }),

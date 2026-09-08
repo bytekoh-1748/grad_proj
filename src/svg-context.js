@@ -4,11 +4,12 @@ const NS='http://www.w3.org/2000/svg';
 const identity=()=>[1,0,0,1,0,0];
 const f=n=>Number(n.toFixed(3));
 const attrs=(el,values)=>Object.entries(values).forEach(([key,value])=>{if(el.getAttribute(key)!==String(value))el.setAttribute(key,value);});
+let contextId=0;
 
 // The existing six track drawing functions now write native SVG paths.
 // This deliberately implements only the path/state operations used by those tracks.
 export class SVGContext {
-  constructor(root = null) { this.root=root; this.nodes=[]; this.clipNodes=[]; this.reset(); }
+  constructor(root = null) { this.root=root; this.prefix=`track-${contextId++}`;this.nodes=[]; this.clipNodes=[]; this.reset(); }
   reset() {
     this.fillStyle='#000';this.strokeStyle='#000';this.lineWidth=1;this.globalAlpha=1;
     this.lineCap='butt';this.lineJoin='miter';this.transform=identity();this.clipId=-1;
@@ -48,16 +49,16 @@ export class SVGContext {
     if(!this.root)return;
     if(!this.defs){this.defs=document.createElementNS(NS,'defs');this.root.appendChild(this.defs);}
     this.clips.forEach((clip,i)=>{
-      if(!this.clipNodes[i]){const el=document.createElementNS(NS,'clipPath');el.id=`track-clip-${i}`;el.setAttribute('clipPathUnits','userSpaceOnUse');el.appendChild(document.createElementNS(NS,'path'));this.defs.appendChild(el);this.clipNodes[i]=el;}
+      if(!this.clipNodes[i]){const el=document.createElementNS(NS,'clipPath');el.id=`${this.prefix}-clip-${i}`;el.setAttribute('clipPathUnits','userSpaceOnUse');el.appendChild(document.createElementNS(NS,'path'));this.defs.appendChild(el);this.clipNodes[i]=el;}
       attrs(this.clipNodes[i].firstChild,clip);
     });
     this.commands.forEach((command,i)=>{
       if(!this.nodes[i]){const g=document.createElementNS(NS,'g');g.appendChild(document.createElementNS(NS,'path'));this.root.appendChild(g);this.nodes[i]=g;}
       const group=this.nodes[i],{clip,...values}=command;
-      group.removeAttribute('display');
-      if(clip>=0)group.setAttribute('clip-path',`url(#track-clip-${clip})`);else group.removeAttribute('clip-path');
+      if(group.hasAttribute('display'))group.removeAttribute('display');
+      if(clip>=0)attrs(group,{'clip-path':`url(#${this.prefix}-clip-${clip})`});else if(group.hasAttribute('clip-path'))group.removeAttribute('clip-path');
       attrs(group.firstChild,values);
     });
-    for(let i=this.commands.length;i<this.nodes.length;i++)this.nodes[i].setAttribute('display','none');
+    for(let i=this.commands.length;i<this.nodes.length;i++)attrs(this.nodes[i],{display:'none'});
   }
 }

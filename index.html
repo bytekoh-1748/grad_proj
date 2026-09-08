@@ -4,16 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffc20e">
-  <title>MY ROOM — Your own pace</title>
+  <title>ROOM — Your own pace</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Quantico:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Quantico:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="editions.css">
 </head>
 <body>
 <main id="room" class="room" data-view="home" data-activity="home" data-state="loading">
-  <svg id="stage" class="stage" viewBox="0 0 1600 900" aria-label="움직이는 팝아트 리스닝 룸">
+  <svg id="stage" class="stage" viewBox="0 0 1600 900" aria-label="빛과 물체가 움직이는 방">
     <defs>
+      <radialGradient id="ambient-a"><stop stop-color="var(--art-a)" stop-opacity=".85"/><stop offset=".5" stop-color="var(--art-a)" stop-opacity=".25"/><stop offset="1" stop-color="var(--art-a)" stop-opacity="0"/></radialGradient>
+      <radialGradient id="ambient-b"><stop stop-color="var(--art-b)" stop-opacity=".7"/><stop offset=".55" stop-color="var(--art-c)" stop-opacity=".15"/><stop offset="1" stop-color="var(--art-b)" stop-opacity="0"/></radialGradient>
+      <linearGradient id="material-sheen" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".65"/><stop offset=".3" stop-color="#fff" stop-opacity=".03"/><stop offset=".65" stop-color="#fff" stop-opacity=".04"/><stop offset=".85" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity=".08"/></linearGradient>
+      <filter id="soft-light" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="9"/></filter>
       <clipPath id="floor-clip"><path id="floor-clip-path"/></clipPath>
       <pattern id="dots-dense" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="2.8" fill="var(--ink)"/></pattern>
       <pattern id="dots-mid" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.8" fill="var(--ink)"/></pattern>
@@ -22,7 +27,8 @@
     </defs>
     <rect width="100%" height="100%" fill="var(--wall-paper)"/>
     <g id="drawing">
-      <path id="floor" fill="var(--wash)"/>
+      <path id="floor" fill="var(--wash)"/><g id="edition-floor-art" aria-hidden="true" clip-path="url(#floor-clip)"/>
+      <g id="floor-surface" aria-hidden="true" clip-path="url(#floor-clip)"/>
       <g id="wall-light" fill="#fffbe4" aria-hidden="true">
         <path id="wall-light-0"/><path id="wall-light-1"/><path id="wall-light-2"/><path id="wall-light-3"/>
       </g>
@@ -39,7 +45,7 @@
       <g id="activity-edges" aria-hidden="true"/>
       <g id="record-shadows" aria-hidden="true"/>
       <g id="deck-sides" aria-hidden="true"/>
-      <g id="deck-base" data-deck="true" aria-hidden="true"/>
+      <g id="deck-base" data-deck="true" aria-hidden="true"/><path id="deck-material" fill="url(#material-sheen)" pointer-events="none"/>
     </g>
   </svg>
   <div id="activity-layer" class="activity-layer"></div>
@@ -59,26 +65,30 @@
       <span id="track-meta" class="track-meta">4:12<br>92 BPM</span>
     </div>
   </section>
-  <footer class="room-controls">
-    <button id="go-home" class="home-key" type="button" hidden>← 방으로</button>
-    <span id="home-caption" class="home-caption">MY ROOM <span>·</span> YOUR OWN PACE.</span>
+  <button id="go-home" class="home-key" type="button" hidden>← 방으로</button>
+  <span id="home-caption" class="home-caption">ROOM / YOUR OWN PACE.</span>
+  <button id="space-toggle" class="space-toggle" type="button" aria-label="공간 조절" aria-expanded="false" aria-controls="space-controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M9 4v6m6 4v6"/></svg></button>
+  <section id="space-controls" class="room-controls" aria-label="공간 조절" hidden>
+    <div class="space-panel-title"><span>공간 조절 <small id="palette-name">Citrus</small></span><button id="close-space" aria-label="공간 조절 닫기">×</button></div>
     <nav aria-label="구도" class="view-controls">
       <button data-view="listen" aria-pressed="true">사선</button>
       <button data-view="room" aria-pressed="false">넓게</button>
       <button data-view="deck" aria-pressed="false">반대편</button>
       <button data-view="wall" aria-pressed="false">벽 쪽</button>
     </nav>
-    <div class="daylight-controls">
-      <label for="light-time">빛 <output id="light-readout" for="light-time">13:00</output></label>
-      <input id="light-time" type="range" min="7" max="19" step=".02" value="13" aria-label="빛의 시간">
-      <button id="light-auto" type="button" aria-pressed="true" title="장면 속 빛의 시간을 흘려보내기">흐름</button>
+    <div class="daylight-controls" id="light-debug" hidden>
+      <label for="light-time">시각 <output id="light-readout" for="light-time">13:00</output></label>
+      <input id="light-time" type="range" min="0" max="23.98" step=".02" value="13" aria-label="가상 시각">
+      <button id="light-auto" type="button" aria-pressed="true">현재 시각</button>
     </div>
     <p id="room-hint" class="sr-only">LP를 골라 재생해 보세요</p>
     <div class="zoom-controls" role="group" aria-label="화면 크기">
       <button data-zoom="out" aria-label="작게 보기">−</button>
       <button data-zoom="in" aria-label="크게 보기">+</button>
     </div>
-  </footer>
+    <div id="glass-option" hidden><button id="solid-glass" aria-pressed="false">투명도 줄이기</button></div>
+  </section>
+  <p id="design-status" class="sr-only" role="status"></p>
   <p class="sr-only" id="live-status" role="status"></p>
   <div id="loading" class="loading"><span class="loading-disc"></span><p>색판을 펼치고 있어요.</p></div>
   <div id="room-error" class="room-error" hidden><p>화면을 불러오지 못했어요.</p><button id="reload">다시 불러오기</button></div>
