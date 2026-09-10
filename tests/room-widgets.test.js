@@ -8,7 +8,7 @@ import {Calculator,monthCells,decodePixels} from '../src/editor/widget-utils.js'
 test('every widget can be authored, restored and undone without changing existing objects',()=>{
   const original=INITIAL_ROOMS[0].source,h=new RoomHistory(original);let code=original;
   for(const kind of KINDS){assert.ok(WIDGETS[kind].size.every(n=>n>0));code=appendObject(code,kind,{content:WIDGETS[kind].content||''}).code;}
-  h.commit(code);const rooms=INITIAL_ROOMS.map(r=>({...r,history:r.id==='master'?h:new RoomHistory(r.source)}));const saved=decodeProject(JSON.parse(JSON.stringify(encodeProject(rooms,'master'))));const added=parseRoom(saved.rooms[0].history.source).scene.objects.slice(5);assert.deepEqual(added.map(o=>o.kind),KINDS);for(const object of added)assert.equal(object.action,WIDGETS[object.kind].action);h.undo();assert.equal(h.source,original);
+  h.commit(code);const rooms=INITIAL_ROOMS.map(r=>({...r,history:r.id==='master'?h:new RoomHistory(r.source)}));const saved=decodeProject(JSON.parse(JSON.stringify(encodeProject(rooms,'master'))));const added=parseRoom(saved.rooms[0].history.source).scene.objects.slice(parseRoom(original).scene.objects.length);assert.deepEqual(added.map(o=>o.kind),KINDS);for(const object of added)assert.equal(object.action,WIDGETS[object.kind].action);h.undo();assert.equal(h.source,original);
 });
 test('calendar accounts for leap years and months starting at either end of a week',()=>{assert.equal(monthCells(2024,1).filter(Boolean).length,29);assert.equal(monthCells(2025,1).filter(Boolean).length,28);assert.equal(monthCells(2026,7)[6],1);assert.equal(monthCells(2026,2)[0],1);assert.equal(monthCells(2026,7)[36],31);});
 test('calculator handles chained operations, repeated equals, decimals and division by zero',()=>{const c=new Calculator(),run=keys=>{for(const key of keys)c.input(key);return c.display;};assert.equal(run(['2','+','3','=','=']),'8');assert.equal(run(['4','=']),'4');assert.equal(run(['AC','0','.','1','+','0','.','2','=']),'0.3');assert.equal(run(['AC','8','÷','0','=']),'Error');assert.equal(run(['7','×','3','−','1','=']),'20');assert.equal(run(['AC','2','0','0','%']),'2');assert.equal(run(['±']),'-2');assert.equal(run(['AC','9','+','×','2','=']),'18');});
@@ -17,7 +17,7 @@ test('design changes survive save and undo while preserving pose, content and co
   const original=appendObject(INITIAL_ROOMS[0].source,'calendar',{at:[-4,2,3],rotate:[0,32,0],scale:1.6,content:'my date'}).code.trimEnd()+' // keep this note\n';
   const h=new RoomHistory(original),before=parseRoom(original).scene.objects.at(-1);
   assert.equal(before.variant,'classic');
-  h.commit(patchObject(original,'calendar-1',{variant:'ticket'}));
+  h.commit(patchObject(original,before.id,{variant:'ticket'}));
   const saved=decodeProject(JSON.parse(JSON.stringify(encodeProject([{id:'master',name:'master.room',history:h}],'master'))));
   const restored=saved.rooms[0].history.source,after=parseRoom(restored).scene.objects.at(-1);
   assert.deepEqual(after,{...before,variant:'ticket'});assert.ok(restored.endsWith('// keep this note\n'));

@@ -1,0 +1,19 @@
+// ROOM / master — an unfinished personal exhibition
+room "master"
+title "Everything in\nits wrong place."
+composition "floor"
+palette "citrus"
+surface {"width":50,"depth":24,"wall":true}
+light {"color":"#fff0ce","intensity":3,"cycle":"still"}
+shader {"pattern":"grain","strength":0.12,"speed":0.35,"code":""}
+
+// at [horizontal, layer, vertical] · rotate [tilt, angle, tilt]
+// relief 0–0.65: depth within the printed image
+object "camera-1" camera {"at":[-4,0.55,-1],"rotate":[0,-4,0],"scale":1.4,"color":"#edff52","material":"clay","relief":0.32,"action":"gallery","content":"photos","motion":"none"}
+object "turntable-1" turntable {"at":[1.5,1.25,2.4],"rotate":[0,5,0],"scale":1.25,"color":"#edff52","material":"clay","relief":0.28,"action":"music","content":"midnight-rotation"}
+object "lamp-1" lamp {"at":[-8.3,0.25,3.1],"rotate":[0,8,0],"scale":1.05,"color":"#edff52","material":"clay","relief":0.34,"action":"light","motion":"none"}
+object "book-1" book {"at":[7,0.6,1.7],"rotate":[0,-4,0],"scale":1.1,"color":"#edff52","material":"clay","relief":0.18,"action":"article","content":"empty-time"}
+object "portal-1" portal {"at":[7.2,0.85,-3.9],"rotate":[0,3,0],"scale":0.9,"color":"#edff52","material":"clay","relief":0.4,"action":"room","content":"music"}
+object "calendar-1" calendar {"at":[2,0.4,-5.7],"rotate":[0,3,0],"scale":1.05,"color":"#ff7353","variant":"peel","relief":0.22,"appearance":{"date":"2026-08-18"}}
+object "scope-1" scope {"at":[-10,0.65,-3.7],"rotate":[0,0,0],"scale":0.85,"color":"#edff52","material":"clay","motion":"none","surface":"floor","variant":"radar","content":"midnight-rotation","action":"music"}
+object "sketch-1" sketch {"at":[7.4,0.7,5.7],"rotate":[0,-2,0],"scale":0.85,"color":"#c2b3ed","material":"clay","motion":"none","surface":"floor","variant":"classic","content":"","action":"sketch"}

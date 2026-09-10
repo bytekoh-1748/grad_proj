@@ -4,6 +4,7 @@ import {makeObject,disposeObject,refreshWidget} from '../src/editor/models.js';
 import {RoomRenderer} from '../src/editor/renderer.js';
 import {KINDS,WIDGETS,widgetSize} from '../src/editor/widget-catalog.js';
 import {parseRoom} from '../src/editor/room-code.js';
+import {supportAt} from '../src/editor/platform-motion.js';
 import {INITIAL_ROOMS} from '../src/editor/templates.js';
 const assert=(condition,message)=>{if(!condition)throw Error(message);};
 try {
@@ -67,7 +68,40 @@ try {
   assert(world.pick(shapePoint(.5,1-464/(1000*4.2/3.7)))?.userData.id==='camera-1','The record center hole passes clicks to the image behind');
   const clock=makeObject('clock','#c2b3ed','clay',.24,'','dial'),later=new Date(Date.now()+120000),clockGeometry=clock.getObjectByName('relief').geometry;
   assert(refreshWidget(clock,later),'Clock refreshes after the minute changes');assert(!refreshWidget(clock,later),'Clock does not redraw within the same minute');assert(clock.getObjectByName('relief').geometry===clockGeometry&&clock.userData.variant==='dial','Clock refresh retains the chosen silhouette and geometry');disposeObject(clock);
-  const result={pass:true,widgetClockRefresh:'pass',silhouettePicking:'pass',designCount:Object.keys(cutouts).length,changedReliefPixels:changed,totalPixels:65536,averageRGBDifference:+(delta/65536/3).toFixed(2),planeVertices:4,cameraBounds:'pass',reducedMotion:'pass',cancelDrag:'pass',cutoutPicking:'pass',transformHandles:'pass',gestureCameraFreeze:'pass',visitHoverEditManual:'pass',rightDragAndWheel:'pass',wheelBurstUndo:'pass',inputCancellation:'pass',leftMoveOnly:'pass',cutouts,gpuError:gl.getError()};
+  const residentData=parseRoom(INITIAL_ROOMS[0].source).scene;
+  world.apply(residentData);world.setMode(false);world.reduced=false;world.residents.interactionsEnabled=false;world.residents.rebuild();
+  const actor=world.residents.actor,platforms=actor.platforms,initialScene=JSON.stringify(world.data);
+  // Isolate the free locomotion engine from the separately tested visitor scheduler.
+  actor.setPlatforms(platforms);actor.destinationId=null;world.residents.residents[0].phase='travel';
+  assert(platforms.some(p=>p.kind==='type')&&platforms.some(p=>p.kind==='camera'),'Actual typography and widget silhouettes create platforms');
+  const states=new Set(),visited=new Set();
+  for(let frame=0;frame<7200;frame++){
+    world.residents.update(1/60);states.add(actor.state);visited.add(actor.platform.id);
+    assert(actor.visible&&[actor.x,actor.y,actor.z].every(Number.isFinite),'Resident stays on a valid physical route');
+    if(actor.state!=='air'){
+      const support=supportAt(actor.platform,actor.x);
+      assert(support&&Math.abs(support.z-actor.z)<.001&&Math.abs(support.y-actor.y)<.001,'Planted foot uses the actual edge in all three room coordinates');
+    }
+  }
+  assert(states.has('walk')&&states.has('crouch')&&states.has('air')&&states.has('land'),'Walking, anticipation, flight and impact are all reached');
+  assert(visited.size>=3,'Resident traverses multiple actual scene ledges');
+  assert(JSON.stringify(world.data)===initialScene,'Physics never mutates room source');
+  // Check the planted origin through the actual perspective camera, not only world coordinates.
+  while(actor.state==='air')world.residents.update(1/60);
+  world.residents.figure.updateWorldMatrix(true,false);
+  const planted=new THREE.Vector3(actor.x,actor.y,actor.z),foot=world.residents.figure.localToWorld(new THREE.Vector3(0,0,0));
+  for(const position of [[1.4,world.baseHeight*.65,1.1],[-1.4,world.baseHeight,-1.1]]){
+    world.flyTo({position,target:[0,0,0],fov:46},true);world.camera.updateMatrixWorld();
+    const a=planted.clone().project(world.camera),b=foot.clone().project(world.camera);
+    const error=Math.hypot((a.x-b.x)*320,(a.y-b.y)*240);
+    assert(error<1,`Foot contact stays within a pixel of its ledge at different camera tilts and zoom (${error.toFixed(3)}px)`);
+  }
+  const frozenActor=[actor.x,actor.y,actor.z,actor.time];world.reduced=true;world.residents.update(1);assert(JSON.stringify([actor.x,actor.y,actor.z,actor.time])===JSON.stringify(frozenActor),'Pause freezes physical time and position');
+  world.setMode(true);world.residents.update(1/60);assert(!world.residents.group.visible&&world.art.visible&&world.fragments.visible,'Editor hides only the resident and retains the original home art');
+  const typeMesh=world.art.getObjectByName('room-type');typeMesh.updateWorldMatrix(true,false);
+  assert(world.residents.figure.rotation.x===typeMesh.rotation.x,'Resident and typography share the room projection plane');
+  const roomPhysics={platforms:platforms.length,visited:visited.size,states:[...states],contact:'pass',sourceUnchanged:'pass',pause:'pass',commonProjection:'pass',projectedFootContact:'pass'};
+  const result={pass:true,roomPhysics,widgetClockRefresh:'pass',silhouettePicking:'pass',designCount:Object.keys(cutouts).length,changedReliefPixels:changed,totalPixels:65536,averageRGBDifference:+(delta/65536/3).toFixed(2),planeVertices:4,cameraBounds:'pass',reducedMotion:'pass',cancelDrag:'pass',cutoutPicking:'pass',transformHandles:'pass',gestureCameraFreeze:'pass',visitHoverEditManual:'pass',rightDragAndWheel:'pass',wheelBurstUndo:'pass',inputCancellation:'pass',leftMoveOnly:'pass',cutouts,gpuError:gl.getError()};
   disposeObject(artwork);target.dispose();world.destroy();window.__roomQA=result;document.querySelector('#result').textContent=JSON.stringify(result,null,2);
 } catch(error){window.__roomQA={pass:false,error:error.stack};document.querySelector('#result').textContent=error.stack;console.error(error);}
 </script></body></html>

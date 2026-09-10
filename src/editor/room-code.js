@@ -1,5 +1,6 @@
 /** A data-only, line-based .room language. No JavaScript is evaluated. */
 import {KINDS,WIDGETS,widgetVariant} from './widget-catalog.js';
+import {appearanceError} from './widget-appearance.js';
 export {KINDS} from './widget-catalog.js';
 export const MATERIALS = ['clay','chrome','glass','ink'];
 export const COMPOSITIONS = ['floor','close','graphic'];
@@ -49,7 +50,8 @@ export function parseRoom(source){
     let value;try{value=JSON.parse(line.slice(start,end));}catch{fail('따옴표, 쉼표, 괄호를 확인하세요.',index+1);}
     if(key==='object'){
       if(!record(value))fail('오브제 속성은 { } 안에 작성하세요.',index+1);
-      const o={at:[0,0,0],rotate:[0,0,0],scale:1,color:'#9268d5',material:'clay',variant:'classic',relief:.24,motion:'none',surface:'floor',action:WIDGETS[kind].action,content:'',...value,id,kind};
+      const o={at:[0,0,0],rotate:[0,0,0],scale:1,color:'#9268d5',material:'clay',variant:'classic',relief:.24,motion:'none',surface:'floor',action:WIDGETS[kind].action,content:'',appearance:{},...value,id,kind};
+      const invalidAppearance=appearanceError(o.appearance);if(invalidAppearance)fail(invalidAppearance,index+1);
       if(!vec(o.at,-100,100)||!vec(o.rotate,-360,360)||!finite(o.scale,.15,6))fail('위치 ±100, 회전 ±360, 크기 0.15–6 범위를 사용하세요.',index+1);
       if(!widgetVariant(kind,o.variant))fail('이 위젯에서 사용할 수 없는 디자인입니다.',index+1);
       if(!finite(o.relief,0,.65))fail('이미지 깊이 relief는 0–0.65 범위입니다.',index+1);

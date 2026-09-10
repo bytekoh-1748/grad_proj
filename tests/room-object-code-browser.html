@@ -1,0 +1,19 @@
+<!doctype html><html><meta charset="utf-8"><title>Object code editor checks</title><style>body{margin:24px;background:#0b0b0b;color:#fff;font:13px monospace}#editor{height:300px;border:1px solid #666}.cm-editor{height:100%}pre{white-space:pre-wrap}</style><div id="editor"></div><pre id="result">Running…</pre><script type="module">
+import {createCodeEditor} from '../src/editor/code-editor.js';
+import {objectCode,mergeObjectCode} from '../src/editor/object-code.js';
+import {parseRoom,RoomHistory} from '../src/editor/room-code.js';
+import {undo} from '@codemirror/commands';
+const source='room "test"\nobject "date-1" calendar {"scale":1,"appearance":{"date":"2026-08-18"}}\nobject "note-1" book {"content":"Original text"}\n',history=new RoomHistory(source),assert=(v,m)=>{if(!v)throw Error(m);};let scope;
+const editor=createCodeEditor(document.querySelector('#editor'),{onChange:value=>history.draft=scope?mergeObjectCode(scope,value):value,onRun:()=>history.commit(history.draft),onUndo:()=>history.undo(),onRedo:()=>history.redo(),isDirty:()=>history.dirty});
+const open=id=>{scope=id?objectCode(history.draft,id):null;editor.value=scope?.code??history.draft;},replace=(from,to)=>{const at=editor.value.indexOf(from);assert(at>=0,'Expected editable token');editor.view.dispatch({changes:{from:at,to:at+from.length,insert:to}});};
+try{
+  open('date-1');replace('2026-08-18','2026-05-12');assert(history.dirty&&parseRoom(history.draft).scene.objects[0].appearance.date==='2026-05-12','Object changes flow into the full draft');
+  open('note-1');assert(!undo(editor.view),'Switching scopes clears the previous editor history');assert(parseRoom(history.draft).scene.objects[0].appearance.date==='2026-05-12','Switching scopes preserves unapplied edits');
+  replace('Original text','Changed text');assert(undo(editor.view),'Local text undo works');assert(parseRoom(history.draft).scene.objects[1].content==='Original text','Undo affects only this object');
+  open(null);assert(editor.value.includes('2026-05-12')&&editor.value.includes('Original text'),'Whole-room view preserves the merged draft');
+  history.commit(history.draft);editor.value=history.source;assert(history.undo()&&history.source===source,'Committed changes share room undo');
+  open('date-1');replace('1,','oops,');assert(history.dirty,'Invalid object code remains a draft');let failed=false;try{parseRoom(history.draft);}catch{failed=true;}assert(failed&&history.source===source,'Invalid code preserves the rendered source');
+  history.draft=history.source;open('date-1');assert(parseRoom(history.source).scene.objects[0].appearance.date==='2026-08-18','Discard restores the original object');
+  document.querySelector('#result').textContent=JSON.stringify({pass:true,scopedEditing:true,draftSurvivesScopeSwitch:true,isolatedEditorUndo:true,sharedRoomUndo:true,invalidDraftRecovery:true});
+}catch(e){document.querySelector('#result').textContent=e.stack;console.error(e);}
+</script></html>

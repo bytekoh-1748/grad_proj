@@ -1,0 +1,9 @@
+#properties-window .appearance-controls{padding:15px;border:1px solid #edff522c;border-radius:7px;background:#edff5205;display:flex;flex-direction:column;gap:12px}
+#properties-window .appearance-label{font-size:12px;color:#edff52}
+#properties-window .appearance-controls p{margin:0;color:#8f8f98;font-size:11px;line-height:1.6}
+#properties-window .appearance-controls .property-label{font-size:12px}
+#properties-window .appearance-controls input{font:13px 'Uncut Sans',sans-serif;min-width:0;width:100%;box-sizing:border-box}
+#properties-window .display-month{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#properties-window .display-month output{font-size:17px;font-variant-numeric:tabular-nums;color:#f1f1df}
+#properties-window .display-month button{font-size:20px;line-height:1;width:34px;height:34px;padding:0;border-radius:50%;color:#edff52}
+#properties-window .display-reset{align-self:flex-start;border:0;background:transparent;padding:0;color:#b2b2bb;font-size:11px;text-decoration:underline;text-underline-offset:3px}

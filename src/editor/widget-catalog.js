@@ -34,8 +34,8 @@ const styles={
   scope:[['radar','레이더',[4,4]]],
 };
 for(const [kind,widget] of Object.entries(WIDGETS)){
-  widget.variants=[...styles[kind].map(([id,name,size])=>({id,name,size})),{id:'classic',name:kind==='calendar'?'월간 달력':'클래식 창',size:widget.size}];
-  widget.preview=widget.variants[0].id;
+  widget.variants=[...styles[kind].map(([id,name,size])=>({id,name,size})),{id:'classic',name:kind==='calendar'?'월간 달력':'프린트 에디션',size:widget.size}];
+  widget.preview='classic';
 }
 export const widgetVariant=(kind,id='classic')=>WIDGETS[kind]?.variants.find(v=>v.id===id);
 export const widgetSize=(kind,id='classic')=>widgetVariant(kind,id)?.size||WIDGETS[kind].size;

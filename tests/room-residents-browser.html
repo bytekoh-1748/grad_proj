@@ -1,0 +1,85 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>ROOM residents checks</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E">
+<style>@font-face{font-family:'Uncut Sans';src:url('/fonts/UncutSans-Variable.woff2');font-weight:100 900}*{box-sizing:border-box}body{margin:0;background:#121318;color:#ecebd7;font:13px monospace}#probe{height:calc(100vh - 100px)}nav{display:flex;align-items:center;gap:12px;padding:12px}button,select,input{font:inherit}#result{white-space:pre-wrap;padding:0 14px;max-height:50px;overflow:auto}</style></head><body><div id="probe"></div><nav>
+<button id="run">Run integration checks</button><label>Scene <select id="scene"><option value="all">Home</option><option value="lamp">SUN</option><option value="calendar">Calendar</option><option value="turntable">Record</option><option value="book">Reading</option></select></label><label>Visit time <input id="time" type="range" min="0" max="27" value="10" step=".1"></label><button id="play">Play / pause</button><button id="tilt">Tilt</button><button id="edit">Edit / view</button></nav><pre id="result">Ready</pre>
+<script type="module">
+import * as THREE from 'three';
+import {RoomRenderer} from '../src/editor/renderer.js';
+import {parseRoom} from '../src/editor/room-code.js';
+import {INITIAL_ROOMS} from '../src/editor/templates.js';
+import {supportAt} from '../src/editor/platform-motion.js';
+import {WidgetVisit} from '../src/editor/widget-scenes.js';
+import {pagePoint} from '../src/editor/widget-activities.js';
+const $=s=>document.querySelector(s),assert=(value,message)=>{if(!value)throw Error(message);};
+await document.fonts.load('800 30px "Uncut Sans"');
+const source=parseRoom(await (await fetch('/docs/studio-layout.room')).text()).scene;
+const world=new RoomRenderer($('#probe'));world.apply(structuredClone(source));world.residents.rebuild();
+cancelAnimationFrame(world.frame);world.frame=null;
+let inspecting=false,testing=false,inspectionCenter=null,previous=performance.now();
+function render(now){const dt=Math.min(.05,(now-previous)/1000);previous=now;if(!testing){world.residents.update(world.reduced?0:dt);if(inspecting){for(const r of world.residents.residents.slice(1)){r.figure.visible=r.shadow.visible=false;}world.camera.position.set(inspectionCenter.x+.4,8,inspectionCenter.z+.35);world.camera.lookAt(inspectionCenter.x,0,inspectionCenter.z);}world.renderer.render(world.scene,world.camera);}requestAnimationFrame(render);}requestAnimationFrame(render);
+const draw=()=>{world.residents.update(0);world.renderer.render(world.scene,world.camera);};
+const stage=()=>{
+  const kind=$('#scene').value;world.reduced=true;world.setMode(false);
+  world.apply(structuredClone(source));world.residents.rebuild();
+  inspecting=kind!=='all';if(kind==='all'){world.home(true);draw();return;}
+  const object=world.data.objects.find(o=>o.kind===kind),group=world.objects.get(object.id),r=world.residents.residents[0];
+  const platform=r.actor.platforms.find(p=>p.objectId===object.id);r.actor.platform=platform;Object.assign(r.actor,supportAt(platform,(platform.points[0].x+platform.points.at(-1).x)/2));r.actor.state='visit';r.actor.visible=true;r.phase='visit';
+  r.visit=new WidgetVisit(group,r.actor);world.residents.group.add(r.visit.group);r.visit.time=Number($('#time').value);r.actor.time+=.05;
+  // An enlarged isolated specimen is a visual test only, never a change to a user's room.
+  const center=group.position.clone();inspectionCenter=center;world.camera.position.set(center.x+.4,8,center.z+.35);world.camera.lookAt(center.x,0,center.z);world.basePosition.copy(world.camera.position);world.target.set(center.x,0,center.z);
+  for(const other of world.residents.residents.slice(1)){other.figure.visible=other.shadow.visible=false;}
+  cancelAnimationFrame(world.frame);draw();
+  for(const other of world.residents.residents.slice(1)){other.figure.visible=other.shadow.visible=false;}
+  world.renderer.render(world.scene,world.camera);
+  $('#result').textContent=JSON.stringify({activity:r.visit.activity,...r.visit.sample});
+};
+$('#scene').onchange=stage;$('#time').oninput=stage;
+$('#play').onclick=()=>{world.reduced=!world.reduced;};
+$('#tilt').onclick=()=>{world.camera.position.x+=.9;world.camera.position.z-=.8;world.camera.lookAt(world.target);world.basePosition.copy(world.camera.position);draw();};
+$('#edit').onclick=()=>{world.setMode(!world.editable);draw();};
+$('#run').onclick=async()=>{
+  $('#result').textContent='Running…';testing=true;inspecting=false;cancelAnimationFrame(world.frame);world.frame=null;
+  try{
+    for(const r of world.residents.residents){world.residents.endVisit(r);r.actor.visible=false;r.cooldowns.clear();}
+    world.apply(structuredClone(source));world.setMode(false);world.reduced=false;world.residents.seed=381;world.residents.rebuild();
+    world.home(true);assert(Math.abs(world.basePosition.y/world.baseHeight-1.3)<1e-8,'Default home is maximum zoom out');
+    const snapshot=JSON.stringify(world.data),residents=world.residents.residents,seen=new Set(),phases=new Set();let releases=0,maxDepth=0,returns=0,departures=0,maxActive=0;const counts=new Set(),life=new Set();
+    assert(residents.length===3&&world.residents.activeCount===0,'Three slots start hidden inside the burrow');assert(world.residents.choices().length===4,`All four activities have a physical round trip: ${JSON.stringify({choices:world.residents.choices().map(p=>p.objectId),ledges:world.residents.actor.platforms.map(p=>({id:p.id,a:p.points[0],b:p.points.at(-1)}))})}`);
+    for(let frame=0;frame<42000;frame++) {
+      const before=residents.filter(r=>r.visit).length,oldPhases=residents.map(r=>r.phase);world.residents.update(1/60);
+      maxActive=Math.max(maxActive,world.residents.activeCount);counts.add(world.residents.activeCount);assert(maxActive<=3,'At most three residents are outside');
+      residents.forEach((r,i)=>{life.add(r.phase);if(oldPhases[i]==='inside'&&r.phase==='emerge')departures++;if(oldPhases[i]==='enter'&&r.phase==='inside')returns++;assert(!(oldPhases[i]==='travel'&&r.phase==='inside'),'No missed jump silently retires a traveler');});
+      releases+=Math.max(0,before-residents.filter(r=>r.visit).length);
+      const occupied=residents.filter(r=>r.visit).map(r=>r.visit.data.id);assert(new Set(occupied).size===occupied.length,'Only one visitor owns a widget');
+      for(const r of residents){
+        if(r.phase==='inside'){assert(!r.figure.visible&&!r.actor.visible,'Waiting residents are hidden');continue;}
+        assert(r.actor.visible&&[r.actor.x,r.actor.y,r.actor.z].every(Number.isFinite),`Every resident remains valid: ${JSON.stringify({frame,seed:r.actor.seed,state:r.actor.state,visible:r.actor.visible,x:r.actor.x,y:r.actor.y,z:r.actor.z,platform:r.actor.platform?.id})}`);
+        if(r.visit){
+          const visit=r.visit,s=visit.sample;seen.add(visit.activity);phases.add(s.phase);
+          const expected=visit.mesh.localToWorld(new THREE.Vector3(s.position.x,s.position.y,s.position.z));assert(expected.distanceTo(r.figure.position)<1e-7,'The resident inherits the exact widget transform');
+          if(visit.page&&s.phase==='activity'){
+            const hand=pagePoint(visit.width,visit.height,1,.55,s.curl),actual=new THREE.Vector3(s.position.x-38/153.6*visit.scale,s.position.y+135/153.6*visit.scale,s.position.z-.015);
+            assert(actual.distanceTo(new THREE.Vector3(hand.x,hand.y,hand.z))<1e-7,'Hand follows the deforming page');maxDepth=Math.max(maxDepth,hand.z);
+          }
+        }else if(r.actor.state!=='air')assert(supportAt(r.actor.platform,r.actor.x),'Outside feet stay on a ledge');
+      }
+      if(frame%600===0)await new Promise(resolve=>setTimeout(resolve,0));
+    }
+    assert(['sunbath','calendar','record','read'].every(a=>seen.has(a)),`All four activities are reached: ${[...seen]}; phases ${residents.map(r=>[r.phase,r.targetId,r.actor.platform?.id,r.actor.goal?.platform.id,r.actor.state,r.actor.x,r.actor.z])}`);assert(returns>=4&&departures>returns,`Trips return into the burrow: ${returns}/${departures}`);assert([1,2,3].every(n=>counts.has(n)),`Random occupancy includes one, two and three: ${[...counts]}`);
+    assert(phases.has('enter')&&phases.has('activity')&&phases.has('exit')&&releases>=4,'Visits enter, stay, and return to walking');
+    assert(maxDepth>1,'Calendar bends visibly');assert(JSON.stringify(world.data)===snapshot,'Visits do not change the stored composition or date');
+    const paused=JSON.stringify(residents.map(r=>[r.actor.time,r.actor.x,r.actor.y,r.actor.z,r.visit?.time,r.phaseTime,world.residents.schedule.time]));world.reduced=true;world.residents.update(1);assert(paused===JSON.stringify(residents.map(r=>[r.actor.time,r.actor.x,r.actor.y,r.actor.z,r.visit?.time,r.phaseTime,world.residents.schedule.time])),'Pause freezes residents and all widget effects');
+    world.setMode(true);world.residents.update(1);assert(!world.residents.group.visible,'Editor hides the residents and effects together');world.setMode(false);world.residents.update(0);assert(world.residents.group.visible,'Appreciation restores the scene');
+    // Rebuild during an occupied visit, including replacing/removing its source mesh.
+    const occupied=residents.find(r=>r.visit);
+    if(occupied){
+      const visit=occupied.visit,id=visit.data.id,object=world.objects.get(id);object.position.x+=.75;object.rotation.y+=.2;object.scale.multiplyScalar(1.12);world.residents.update(0);
+      const p=visit.sample.position,expected=visit.mesh.localToWorld(new THREE.Vector3(p.x,p.y,p.z));assert(expected.distanceTo(occupied.figure.position)<1e-7,'Moving, rotating and scaling an occupied window carries its visitor');
+      const changed=structuredClone(source);changed.objects=changed.objects.filter(o=>o.id!==id);world.apply(changed);world.residents.update(0);assert(residents.every(r=>!r.visit),'Removing an occupied widget releases every stale scene');
+    }
+    world.apply(parseRoom(INITIAL_ROOMS[1].source).scene);world.residents.update(0);assert(residents.every(r=>!r.visit),'Changing rooms clears visits');
+    world.renderer.render(world.scene,world.camera);assert(world.renderer.getContext().getError()===0,'No GPU errors');
+    $('#result').textContent=JSON.stringify({pass:true,maxActive,departures,returns,occupancy:[...counts],lifecycle:[...life],activities:[...seen],phases:[...phases],releases,maxPageDepth:maxDepth,sourceUnchanged:true,pause:true,modeRoundTrip:true,occupiedTransform:true,removalAndRoomSwitch:true,handContact:true,widgetProjection:true});
+  }catch(error){$('#result').textContent=error.stack;console.error(error);}finally{testing=false;}
+};
+</script></body></html>

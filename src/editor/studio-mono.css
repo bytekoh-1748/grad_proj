@@ -1,0 +1,154 @@
+/* Black labels, white type, measured rules. Colour belongs to the work. */
+#app[data-mode=edit]{--accent:#fff;--mono-ink:#fff;--mono-paper:#0b0b0b}
+#app .studio-window{background:#0b0b0b;color:#fff;border-color:#ffffff50;border-radius:16px;box-shadow:0 12px 40px #0003}
+#app .studio-window.window-active{border-color:#fff;box-shadow:0 12px 40px #0004}
+#app .studio-window .studio-window-header{height:52px;min-height:52px;padding:0 18px;background:#0b0b0b;color:#fff;border-bottom:1px solid #ffffff30;border-radius:15px 15px 0 0}
+#app .studio-window .studio-window-header:before{display:none}
+#app .studio-window-header .window-grip{gap:8px;padding:0;letter-spacing:-.05em;color:#fff;cursor:grab}
+#app .studio-window-header .window-grip>svg{display:none}
+#app .studio-window-header .window-title{font:650 29px/.95 'Uncut Sans',sans-serif;letter-spacing:-1.3px}
+.title-dot{color:#fff}
+#app .studio-window-header>button:not(.window-grip){width:28px;min-width:28px;height:28px;border-radius:50%;color:#bfbfbf}
+#app .studio-window-header>button:not(.window-grip):hover{background:#fff;color:#000}
+#app .studio-window [data-window-dock][aria-pressed=true]{color:#fff}
+#app .studio-window .window-edge:focus-visible{outline-color:#fff}
+#app .studio-window .window-edge[data-window-resize=se]:after{border-color:#fff}
+#app .studio-window[data-dock=right]{box-shadow:none;border-left:1px solid #ffffff50;border-radius:0}
+#app .studio-window[data-dock=right] .studio-window-header{border-radius:0}
+
+/* An object label combines a nameplate and a tiny set of live measurements. */
+#app #selection-tag{display:flex;align-items:stretch;gap:20px;min-width:204px;width:max-content;padding:11px 13px 12px 15px;transform:none;background:#090909;color:#fff;border:1px solid #fff;border-radius:12px;box-shadow:0 5px 16px #0002;text-align:left;pointer-events:auto;cursor:pointer;white-space:nowrap}
+#app #selection-tag:hover{background:#fff;color:#000}
+.selection-name{display:flex;flex-direction:column;gap:4px;min-width:0}
+#selection-id{font:9px/1.1 var(--mono);letter-spacing:.02em;opacity:.65;overflow:hidden;text-overflow:ellipsis}
+#selection-title{display:block;font:750 36px/.91 'Uncut Sans',sans-serif;letter-spacing:-1.8px;overflow:hidden;text-overflow:ellipsis;padding-bottom:2px}
+.selection-facts{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;border-left:1px solid #ffffff45;padding-left:12px;gap:7px}
+#selection-tag:hover .selection-facts{border-color:#0004}
+#app #transform-readout{font:10px/1.2 var(--mono);color:inherit;letter-spacing:-.3px}
+.selection-code{font:8px/1 var(--mono);letter-spacing:.04em}
+#app #selection-tag.compact{min-width:0;padding:8px 10px;gap:12px;border-radius:9px}
+#selection-tag.compact #selection-title{font-size:26px;letter-spacing:-1.3px}
+#selection-tag.compact #selection-id{font-size:7px}#selection-tag.compact #transform-readout{font-size:8px}
+#app #selection-outline{stroke:#fff;stroke-dasharray:3 4;stroke-width:1}
+#app #selection-corners,#app #rotation-stem{stroke:#fff}
+#app .transform-handle{width:24px;height:24px;background:#fff;color:#000;border:1px solid #000;box-shadow:none;font-size:18px;border-radius:50%}
+#app .transform-handle:hover{background:#000!important;color:#fff;border-color:#fff}
+#app #scale-handle{border-radius:4px}
+#app #selection-overlay .edit-toolbar{background:#090909;border:1px solid #ffffffb3;box-shadow:0 4px 14px #0002;border-radius:10px;padding:4px;gap:1px;flex-wrap:wrap;justify-content:center}
+#app #selection-overlay .edit-toolbar>button{width:30px;height:30px;min-width:26px;padding:4px;font-size:19px;border-radius:5px;color:#fff}
+#app #selection-overlay .edit-toolbar>button:hover,#app #selection-overlay .edit-toolbar>button[aria-pressed=true]{background:#fff;color:#000}
+#app #selection-overlay .edit-toolbar>i{height:17px;margin:0 4px;background:#fff4}
+#app #selection-overlay #delete-object:hover{background:#fff;color:#000}
+#app #object-popover{width:300px;padding:18px 20px;background:#0b0b0b;color:#fff;border:1px solid #fff;border-radius:13px;box-shadow:0 8px 30px #0003}
+#app #object-popover .small-heading{font:650 25px/1 'Uncut Sans',sans-serif;letter-spacing:-1px;padding:0 0 15px}
+#app #object-popover .object-row{border-color:#ffffff35}
+#app #object-popover .object-row>button:first-child{padding:11px 8px;font:500 14px 'Uncut Sans',sans-serif}
+#app #object-popover .object-row small{color:#999;font-size:9px}
+#app #object-popover .object-row.selected{background:#fff;color:#000}
+#app #object-popover .object-row.selected small{color:#555}
+
+/* The shelf is a continuous catalog with actual, coloured objects. */
+#app #library-window{background:#0b0b0b}
+#app #library-window[data-dock=bottom]{border-top:1px solid #fff5;box-shadow:none}
+#app #library-window .studio-window-header{padding:0 24px;height:57px;min-height:57px;background:#0b0b0b}
+#app #library-window .window-title{font-size:34px;letter-spacing:-1.7px}
+#app .widget-count{font:9px var(--mono);color:#fff;border:1px solid #fff6;border-radius:50%;width:26px;height:26px;display:grid;place-items:center;padding:0;margin-right:9px}
+#app #library-window .library{padding:0 24px;gap:0;align-items:stretch;scrollbar-color:#777 #0b0b0b;scrollbar-width:thin}
+#app #library-window .library-widget{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;flex:0 0 184px;padding:11px 16px 8px;border:0;border-right:1px solid #ffffff26;border-radius:0;gap:7px}
+#app #library-window .library-widget:first-child{padding-left:0;flex-basis:168px}
+.library-tile-heading{display:flex;align-items:baseline;gap:9px;flex-shrink:0;min-width:0}
+.library-tile-heading small{font:8px var(--mono);color:#777}.library-tile-heading strong{font:550 17px/1 'Uncut Sans',sans-serif;letter-spacing:-.6px;color:#fff}.library-tile-heading>span{margin-left:auto;color:#999;font:12px var(--mono)}
+.library-tile-art{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:3px 0}
+#app #library-window .library-widget img{max-width:100%;max-height:100%;height:100%;width:100%;object-fit:contain;filter:none;transition:transform .2s}
+#app #library-window .library-widget:hover img{transform:translateY(-3px) rotate(-2deg);filter:none}
+#app #library-window .library-widget:hover .library-tile-heading>span{color:#fff;transform:translate(2px,-2px)}
+#app #library-window .library-widget[aria-pressed=true] .library-tile-heading:after{content:'';width:5px;height:5px;order:-1;background:#fff;border-radius:50%}
+#app #library-window .library-widget:focus-visible{outline:1px solid #fff;outline-offset:-4px}
+.library-tile-caption{flex-shrink:0;font:8px/1.2 var(--mono);letter-spacing:-.15px;color:#929292;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#app #library-window .library-footer{min-height:32px;height:32px;padding:0 24px;background:#0b0b0b;border-color:#fff3;color:#a0a0a0;display:flex;justify-content:space-between;font:9px 'Uncut Sans',sans-serif}
+#app #library-window .library-footer select{color:#fff;background:#0b0b0b}
+#app #library-crumb{height:32px;min-height:32px;border-color:#fff3;color:#ddd;font:10px var(--mono);padding-left:20px}
+#app #library-back{color:#fff}
+#app #library-window[data-dock=float]{border-radius:16px}
+#app #library-window[data-dock=float] .library{padding:0 12px;gap:0}
+#app #library-window[data-dock=float] .library-widget{height:190px;border-bottom:1px solid #fff3;padding:12px!important}
+#app #library-window[data-dock=float] .library-widget img{max-height:100%}
+
+/* Code is an object sheet, with a doorway back to the room source. */
+#app #code-window,#app #code-window .editor-panel,#app #code-editor,#app #code-window .cm-editor,#app #code-window .cm-gutters{background:#0b0b0b;color:#ddd}
+#app #code-window .source-heading{padding:24px 22px 17px;min-height:126px;height:auto;display:flex;align-items:flex-start;gap:4px;position:relative;border-bottom:1px solid #fff3}
+#app #code-window .source-file-title{display:flex;flex-direction:column;align-items:flex-start;gap:10px;width:100%;min-width:0}
+#app #source-number{font:8px/1.3 var(--mono);letter-spacing:.07em;color:#898989}
+#app #code-filename{font:650 clamp(26px,9cqw,49px)/.98 'Uncut Sans',sans-serif;letter-spacing:-.06em;margin:0;color:#fff;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+#code-context-id{font:9px/1.4 var(--mono);color:#a2a2a2}
+#app #code-window .history-actions{position:absolute;top:13px;right:14px;gap:0}
+#app #code-window .history-actions button{color:#999;width:23px;height:23px;padding:4px}
+#app #code-window .history-actions button:hover:not(:disabled){color:#fff;background:#ffffff18}
+#app #code-window .history-actions svg{width:14px;height:14px}
+#app #code-window .source-files{background:#101010;border-color:#fff3;flex-basis:136px}
+#app #room-files .files-heading,#app #room-files #new-room{color:#999;border-color:#fff3}
+#app #room-files .file-button{color:#999;font-size:11px;border-color:transparent;gap:7px}
+#app #room-files .file-button.active{background:#fff;color:#000;border-color:#fff}
+#app #room-files .file-button.active:before,#app #room-files .file-button.active .file-dot{color:#000}
+#app #room-files .file-button:not(.active):hover,#app #room-files #new-room:hover{background:#ffffff14;color:#fff}
+#app #code-window .editor-heading{margin:0 20px;border-color:#fff3;height:34px;min-height:34px}
+#app #code-window .room-tab.active{color:#fff;border-color:#fff}
+#app #code-window .tab-dirty{color:#fff}
+#app #code-window #code-summary{color:#888}
+#app #code-window .cm-editor{font-size:11px;--code-leading:1.9}
+#app #code-window .cm-content{caret-color:#fff;padding:17px 0 28px!important}
+#app #code-window .cm-activeLine{background:#ffffff08!important;box-shadow:inset 1px 0 #fff}
+#app #code-window .cm-activeLineGutter{color:#fff!important}
+#app #code-window .cm-selectionBackground,#app #code-window .cm-focused .cm-selectionBackground{background:#ffffff30!important}
+#app #code-window .cm-cursor{border-color:#fff!important}
+#app #code-window .cm-matchingBracket{background:#ffffff20!important;outline-color:#ffffff80}
+#app #code-window .code-footer{background:#0b0b0b;border-color:#fff3;padding:12px 20px;height:62px;min-height:62px}
+#app #code-window .code-footer #run-code{background:#fff;color:#000;border:1px solid #fff;border-radius:6px;min-width:105px;height:35px;font-size:20px}
+#app #code-window .code-footer #run-code:hover{background:#0b0b0b;color:#fff}
+#app #code-window .editor-status,#app #code-window #save-state{color:#969696}
+#app #code-window .composition-bar{background:#111;border-color:#fff3;color:#aaa;border-radius:0}
+#app #code-window .composition-bar select{color:#ddd}
+#app #code-error{background:#fff!important;color:#000!important;border-color:#fff!important}
+#object-code-context{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 22px;border-bottom:1px solid #fff3;min-height:43px}
+#object-code-context[hidden]{display:none}#object-declaration{font:9px var(--mono);color:#949494;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#show-room-code{font:9px 'Uncut Sans',sans-serif;white-space:nowrap;color:#fff;padding:0 0 3px;border-bottom:1px solid #fff6}
+#app #code-window[data-scope=object] .source-files,#app #code-window[data-scope=object] .editor-heading,#app #code-window[data-scope=object] .composition-bar,#app #code-window[data-scope=object] #toggle-room-files{display:none}
+#app #code-window[data-scope=object] .editor-panel{border-radius:0}
+#app #code-window[data-scope=object] .source-heading{min-height:135px}
+#app #code-window[data-scope=object] .cm-editor{font-size:12px}
+#app #code-window[data-scope=object] .cm-lineNumbers .cm-gutterElement{min-width:42px;padding-left:14px!important}
+#app #code-window[data-scope=object] .cm-line{padding-left:7px!important}
+
+#app .studio-dock{background:#0b0b0b;border-color:#fff4;color:#fff}
+#app .studio-dock>button[aria-expanded=true],#app .studio-dock>button[aria-pressed=true]{background:#fff;color:#000;border-radius:7px}
+#app .studio-dock>button:hover:not(:disabled){color:#fff;background:#ffffff18}
+#app .studio-dock>button[aria-expanded=true]:hover,#app .studio-dock>button[aria-pressed=true]:hover{color:#000;background:#fff}
+#app .studio-pull{background:#0b0b0b;border-color:#fff4;color:#999}
+#app .studio-pull .pull-handle,#app[data-mode=edit] #panel-toggle{color:#fff}
+#app .studio-pull:focus-visible{outline-color:#fff}
+#app .studio-pull:hover{background:#161616;color:#fff}
+#app .view-toolbar{color:#fff;background:#0b0b0b;border:1px solid #fff6;border-radius:8px;box-shadow:none;padding:3px}
+#app .view-toolbar button:hover{color:#000;background:#fff;border-radius:4px}
+#app .studio-dock-preview{color:#fff;background:#ffffff20;border-color:#fff}
+#app .selection-tag:focus-visible{outline:2px solid #fff;outline-offset:3px}
+#name-dialog,#content-dialog{background:#0b0b0b;color:#fff;border:1px solid #fff8;border-radius:16px;box-shadow:0 12px 45px #0004}
+#name-dialog input{background:#0b0b0b;border-color:#fff6;color:#fff}
+#name-dialog .dark-button{background:#fff;color:#000}
+.toast{background:#0b0b0b;color:#fff;border:1px solid #fff8;border-radius:7px;box-shadow:0 5px 18px #0003}
+@media(max-width:760px){#app #library-window .studio-window-header{height:51px;min-height:51px;padding:0 17px}#app #library-window .window-title{font-size:29px}#app #library-window .library{padding:0 17px}#app #library-window .library-widget{flex-basis:154px;padding:9px 12px;gap:5px}#app #library-window .library-widget:first-child{flex-basis:142px}.library-tile-heading strong{font-size:15px}.library-tile-caption{font-size:7px}#app #library-window .library-footer{padding:0 17px;font-size:8px}#app #library-window .library-footer>span{display:none}#app #code-window .source-heading{padding:23px 14px 14px}#app #code-window[data-scope=object] .source-heading{min-height:120px}#app #code-window .code-footer{padding:10px 12px}#object-code-context{padding:10px 14px;flex-wrap:wrap;gap:8px}#app #code-filename{font-size:clamp(25px,11cqw,44px)}}
+@media(prefers-reduced-motion:reduce){#app #library-window .library-widget img{transition:none}}
+#app #code-window .studio-window-header{height:42px;min-height:42px}
+#app #code-window .studio-window-header .window-title{font:500 11px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+#app #code-window[data-scope=object] #code-filename{font-size:clamp(28px,12cqw,52px)}
+#app #code-window .code-footer{height:auto;min-height:62px;flex-shrink:0;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px}
+#app #code-window .code-footer .editor-status{grid-column:1;display:flex;flex-wrap:wrap;gap:5px 10px}
+#app #code-window #discard-draft{grid-column:2;color:#fff}
+#app #code-window .code-footer #run-code{grid-column:3;margin:0;min-width:96px}
+#app #selection-overlay .edit-toolbar{width:max-content}
+#app[data-mode=edit][data-selection=true] .scene-caption,#app[data-mode=edit][data-selection=true] .scene-meta{visibility:hidden}
+#app #library-window .library{scroll-padding-inline:24px}
+@container(max-width:320px){#app #code-window .code-footer .editor-status{grid-column:1 / -1}#app #code-window .code-footer #run-code{min-width:80px}#app #code-window .source-heading{padding-right:12px;padding-left:12px}}
+@media(max-width:760px){#app #library-window .library{scroll-padding-inline:17px}}
+
+#app #selection-overlay #open-object-code{font:11px var(--mono);letter-spacing:-1px}
+@container(max-width:250px){#app #selection-tag.compact{flex-direction:column;gap:7px}#app #selection-tag.compact #selection-title{font-size:24px}.selection-facts{flex-direction:row;align-items:center;border-left:0;border-top:1px solid #ffffff45;padding:6px 0 0;gap:8px}#selection-tag:hover .selection-facts{border-color:#0004}}

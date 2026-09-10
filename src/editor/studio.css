@@ -256,3 +256,10 @@ dialog{border:2px outset #ddded0;border-radius:0;background:#202124;color:#efeed
   [data-mode=edit] .scene-caption h1{font-size:26px}
 }
 @media(max-width:360px){.brand-caption{display:none}.scene-caption h1{font-size:28px}.scene-bottom .scene-feel>span{font-size:8px}}
+/* Keep the small seaside visible beside the caption in compact desktop layouts. */
+@media(max-width:1050px) and (min-width:761px){
+  [data-mode=visit] .scene-caption{bottom:54px;max-width:315px}
+  [data-mode=visit] .scene-caption h1{font-size:28px;letter-spacing:-1.3px}
+  [data-mode=visit] .scene-caption p{font-size:10px;margin-top:10px}
+  [data-mode=visit] .scene-figure{display:none}
+}
